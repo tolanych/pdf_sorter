@@ -618,6 +618,7 @@ async function main() {
   const toMove = operations.filter((o) => o.action === "move");
 
   if (!args.dryRun) {
+    console.log(`\nMoving ${toMove.length} files...`);
     const totalToMove = toMove.length;
     for (const [index, op] of toMove.entries()) {
       const processed = index + 1;
@@ -631,6 +632,15 @@ async function main() {
         const processedPath = op.action === "move" ? op.to : op.from;
         await appendIgnoreEntries(args.ignoreListPath, [processedPath]);
       }
+    }
+  } else {
+    console.log(`\nDry-run plan (${toMove.length} files to move):`);
+    for (const op of toMove) {
+      console.log(`  ${op.from} -> ${op.to}  [${op.category}]`);
+    }
+    const skipped = operations.filter((o) => o.action === "skip");
+    if (skipped.length > 0) {
+      console.log(`  (${skipped.length} files already in place)`);
     }
   }
 
