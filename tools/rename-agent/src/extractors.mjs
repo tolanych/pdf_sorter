@@ -7,7 +7,10 @@ import mammoth from "mammoth";
 
 const execFileAsync = promisify(execFile);
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_READER_SCRIPT = path.resolve(MODULE_DIR, "../../read_document.py");
+const DEFAULT_READER_SCRIPT = path.resolve(
+  MODULE_DIR,
+  "../../read_document.py",
+);
 
 const textExt = new Set([".xml", ".txt", ".csv", ".json", ".md"]);
 const pdfAndImageExt = new Set([
@@ -42,10 +45,14 @@ async function readDocxSafe(filePath) {
 
 async function readDocSafe(filePath) {
   try {
-    const { stdout } = await execFileAsync("textutil", ["-convert", "txt", "-stdout", filePath], {
-      maxBuffer: 10 * 1024 * 1024,
-      timeout: 60_000,
-    });
+    const { stdout } = await execFileAsync(
+      "textutil",
+      ["-convert", "txt", "-stdout", filePath],
+      {
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 60_000,
+      },
+    );
     return String(stdout || "").slice(0, 12000);
   } catch {
     return "";
@@ -57,30 +64,50 @@ async function readPdfOrImageSafe(filePath) {
   const venvPython = path.join(workspaceRoot, ".venv", "bin", "python");
   const configuredPython = process.env.READER_PYTHON;
   const readerScript = process.env.READER_SCRIPT_PATH || DEFAULT_READER_SCRIPT;
-  const ocrLang = process.env.OCR_LANG || "pol+eng+rus";
+  const ocrLang = process.env.OCR_LANG || "pol+eng+rus+bel+ukr";
 
-  const pythonCandidates = [configuredPython, venvPython, "python3"].filter(Boolean);
+  const pythonCandidates = [configuredPython, venvPython, "python3"].filter(
+    Boolean,
+  );
 
   for (const python of pythonCandidates) {
     try {
-      const { stdout } = await execFileAsync(
+      const { stdout, stderr } = await execFileAsync(
         python,
-        [readerScript, filePath, "--mode", "auto", "--lang", ocrLang],
+        [
+          readerScript,
+          filePath,
+          "--mode",
+          "auto",
+          "--lang",
+          ocrLang,
+          "--smart-pages",
+        ],
         {
           maxBuffer: 20 * 1024 * 1024,
           timeout: 120_000,
         },
       );
 
+      if (stderr) {
+        console.error(`[reader] ${path.basename(filePath)}: ${stderr.trim()}`);
+      }
+
       const text = String(stdout || "").trim();
       if (text.length > 0) {
         return text.slice(0, 12000);
       }
-    } catch {
+    } catch (err) {
+      console.error(
+        `[reader] ${path.basename(filePath)}: ${python} failed — ${err.message || err}`,
+      );
       // try next python candidate
     }
   }
 
+  console.error(
+    `[reader] ${path.basename(filePath)}: all python candidates failed, returning empty`,
+  );
   return "";
 }
 

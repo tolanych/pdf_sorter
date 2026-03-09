@@ -9,7 +9,7 @@
     --mode text       Выцягнуць тэкст з PDF (па змаўчанні для PDF)
     --mode ocr        Распазнаць тэкст праз OCR (па змаўчанні для выяў)
     --mode auto       Аўтаматычна выбраць рэжым (па змаўчанні)
-    --lang pol+eng    Мовы OCR (па змаўчанні: pol+eng+rus)
+    --lang pol+eng    Мовы OCR (па змаўчанні: pol+eng+rus+bel+ukr)
     --pages 1-3       Дыяпазон старонак (толькі для PDF)
     --dpi 300         DPI для рэндэрынгу PDF у выяву (па змаўчанні: 300)
     --output file.txt Захаваць вынік у файл
@@ -71,7 +71,7 @@ def extract_text_pymupdf(pdf_path: str, pages: list[int] | None = None) -> str:
     return "\n\n".join(texts)
 
 
-def ocr_image(image_path: str, lang: str = "pol+eng+rus") -> str:
+def ocr_image(image_path: str, lang: str = "pol+eng+rus+bel+ukr") -> str:
     """Распазнаць тэкст з выявы праз Tesseract OCR."""
     import pytesseract
     from PIL import Image
@@ -83,7 +83,7 @@ def ocr_image(image_path: str, lang: str = "pol+eng+rus") -> str:
 
 def ocr_pdf(
     pdf_path: str,
-    lang: str = "pol+eng+rus",
+    lang: str = "pol+eng+rus+bel+ukr",
     dpi: int = 300,
     pages: list[int] | None = None,
 ) -> str:
@@ -143,7 +143,7 @@ def has_meaningful_text(pdf_path: str, sample_pages: int = 3) -> bool:
         # Калі больш за 40% радкоў — аднасімвальныя, гэта скан з OCR-лэерам
         if total_lines > 0 and total_short_lines / total_lines > 0.4:
             return False
-        return words_per_page >= 10
+        return words_per_page >= 3
     except Exception:
         return False
 
@@ -177,14 +177,52 @@ def parse_pages(pages_str: str) -> list[int]:
     return sorted(set(pages))
 
 
+def _get_pdf_page_count(pdf_path: str) -> int:
+    """Get total page count of a PDF."""
+    try:
+        import fitz
+
+        doc = fitz.open(pdf_path)
+        count = len(doc)
+        doc.close()
+        return count
+    except Exception:
+        return 0
+
+
+def _smart_page_selection(total_pages: int, max_pages: int = 5) -> list[int] | None:
+    """Select pages to read for content identification.
+
+    For short PDFs (≤ max_pages) — read all (return None).
+    For longer PDFs — read first 3 + middle + last page.
+    """
+    if total_pages <= max_pages:
+        return None  # read all
+
+    pages = [0, 1, 2]  # first 3 pages
+    mid = total_pages // 2
+    if mid not in pages:
+        pages.append(mid)
+    last = total_pages - 1
+    if last not in pages:
+        pages.append(last)
+    return sorted(pages)
+
+
 def process_file(
     file_path: str,
     mode: str = "auto",
-    lang: str = "pol+eng+rus",
+    lang: str = "pol+eng+rus+bel+ukr",
     pages: list[int] | None = None,
     dpi: int = 300,
+    smart_pages: bool = False,
 ) -> str:
-    """Апрацаваць файл і вярнуць тэкст."""
+    """Апрацаваць файл і вярнуць тэкст.
+
+    Args:
+        smart_pages: If True and pages is None, automatically select
+                     a subset of pages for long PDFs instead of reading all.
+    """
     file_path = os.path.abspath(file_path)
 
     if not os.path.exists(file_path):
@@ -192,6 +230,17 @@ def process_file(
 
     ext = Path(file_path).suffix.lower()
     image_exts = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".webp", ".gif"}
+
+    # Smart page selection for PDFs when no explicit pages given
+    if ext == ".pdf" and pages is None and smart_pages:
+        total = _get_pdf_page_count(file_path)
+        if total > 0:
+            pages = _smart_page_selection(total)
+            if pages is not None:
+                print(
+                    f"[Smart pages: reading {len(pages)} of {total} pages: {[p + 1 for p in pages]}]",
+                    file=sys.stderr,
+                )
 
     # Вызначыць рэжым
     if mode == "auto":
@@ -203,7 +252,18 @@ def process_file(
         return ocr_image(file_path, lang=lang)
     elif ext == ".pdf":
         if mode == "ocr":
-            return ocr_pdf(file_path, lang=lang, dpi=dpi, pages=pages)
+            try:
+                return ocr_pdf(file_path, lang=lang, dpi=dpi, pages=pages)
+            except Exception as e:
+                print(f"[OCR failed: {e}]", file=sys.stderr)
+                # OCR failed (encrypted PDF, corrupted, etc.) — try text extraction as fallback
+                try:
+                    text = extract_text_pymupdf(file_path, pages=pages)
+                    if text and "тэкст не знойдзены" not in text:
+                        return text
+                except Exception:
+                    pass
+                return f"[UNREADABLE: OCR and text extraction both failed for {Path(file_path).name}]"
         else:
             # Спачатку пробуем PyMuPDF, потым pdfplumber
             try:
@@ -213,9 +273,17 @@ def process_file(
             except Exception:
                 pass
             try:
-                return extract_text_pdfplumber(file_path, pages=pages)
+                text = extract_text_pdfplumber(file_path, pages=pages)
+                if text and "тэкст не знойдзены" not in text:
+                    return text
+            except Exception:
+                pass
+            # Text extraction returned nothing useful — fall back to OCR
+            print("[Text extraction empty, falling back to OCR]", file=sys.stderr)
+            try:
+                return ocr_pdf(file_path, lang=lang, dpi=dpi, pages=pages)
             except Exception as e:
-                return f"ПАМЫЛКА пры чытанні PDF: {e}"
+                return f"[UNREADABLE: all extraction methods failed for {Path(file_path).name}]"
     else:
         # Паспрабаваць прачытаць як тэкст
         try:
@@ -239,7 +307,9 @@ def main():
         help="Рэжым: text (тэкст з PDF), ocr (распазнаванне), auto (аўта)",
     )
     parser.add_argument(
-        "--lang", default="pol+eng+rus", help="Мовы OCR (па змаўчанні: pol+eng+rus)"
+        "--lang",
+        default="pol+eng+rus+bel+ukr",
+        help="Мовы OCR (па змаўчанні: pol+eng+rus+bel+ukr)",
     )
     parser.add_argument(
         "--pages", default=None, help="Дыяпазон старонак, напр. 1-3,5,7-9"
@@ -251,6 +321,12 @@ def main():
         help="DPI для рэндэрынгу PDF (па змаўчанні: 300)",
     )
     parser.add_argument("--output", "-o", default=None, help="Захаваць вынік у файл")
+    parser.add_argument(
+        "--smart-pages",
+        action="store_true",
+        default=False,
+        help="Аўтаматычна выбіраць старонкі для доўгіх PDF (першыя 3 + сярэдзіна + апошняя)",
+    )
 
     args = parser.parse_args()
 
@@ -262,6 +338,7 @@ def main():
         lang=args.lang,
         pages=pages,
         dpi=args.dpi,
+        smart_pages=args.smart_pages,
     )
 
     if args.output:
