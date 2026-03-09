@@ -537,82 +537,89 @@ async function main() {
     console.log(`Existing folders: ${[...existingFolders].join(", ")}`);
   }
 
+  const failures = [];
   const totalSelected = selected.length;
   for (const [index, item] of selected.entries()) {
     const processed = index + 1;
     const remaining = totalSelected - processed;
     const progress = `[${processed}/${totalSelected}, left=${remaining}]`;
 
-    let category;
-    if (args.smart) {
-      try {
-        category = await detectCategorySmart({
-          llm,
-          visionLlm,
-          absPath: item.absPath,
-          relativePath: item.relPath,
-          existingFolders: [...existingFolders],
-        });
-        existingFolders.add(category);
-        console.log(`${progress} Classified: ${item.relPath} -> ${category}`);
-      } catch (err) {
-        const errMsg = String(err?.message || err || "");
-        const isVisionNotFound =
-          visionLlm && /model\s+['"].+['"]\s+not\s+found/i.test(errMsg);
+    try {
+      let category;
+      if (args.smart) {
+        try {
+          category = await detectCategorySmart({
+            llm,
+            visionLlm,
+            absPath: item.absPath,
+            relativePath: item.relPath,
+            existingFolders: [...existingFolders],
+          });
+          existingFolders.add(category);
+          console.log(`${progress} Classified: ${item.relPath} -> ${category}`);
+        } catch (err) {
+          const errMsg = String(err?.message || err || "");
+          const isVisionNotFound =
+            visionLlm && /model\s+['"].+['"]\s+not\s+found/i.test(errMsg);
 
-        if (isVisionNotFound) {
-          visionLlm = null;
-          visionDisabledReason = errMsg;
-          console.error(
-            `${progress} Vision model unavailable (${errMsg}). Falling back to OCR/text classification for remaining files.`,
-          );
-          try {
-            category = await detectCategorySmart({
-              llm,
-              visionLlm: null,
-              absPath: item.absPath,
-              relativePath: item.relPath,
-              existingFolders: [...existingFolders],
-            });
-            existingFolders.add(category);
-            console.log(
-              `${progress} Classified via OCR/text fallback: ${item.relPath} -> ${category}`,
-            );
-            continue;
-          } catch (fallbackErr) {
+          if (isVisionNotFound) {
+            visionLlm = null;
+            visionDisabledReason = errMsg;
             console.error(
-              `${progress} OCR/text fallback failed for ${item.relPath}: ${fallbackErr.message}`,
+              `${progress} Vision model unavailable (${errMsg}). Falling back to OCR/text classification for remaining files.`,
             );
+            try {
+              category = await detectCategorySmart({
+                llm,
+                visionLlm: null,
+                absPath: item.absPath,
+                relativePath: item.relPath,
+                existingFolders: [...existingFolders],
+              });
+              existingFolders.add(category);
+              console.log(
+                `${progress} Classified via OCR/text fallback: ${item.relPath} -> ${category}`,
+              );
+            } catch (fallbackErr) {
+              console.error(
+                `${progress} OCR/text fallback failed for ${item.relPath}: ${fallbackErr.message}`,
+              );
+              category = detectCategory(item.relPath);
+            }
+          } else {
+            console.error(
+              `${progress} Smart classify failed for ${item.relPath}: ${errMsg}`,
+            );
+            category = detectCategory(item.relPath);
           }
-        } else {
-          console.error(
-            `${progress} Smart classify failed for ${item.relPath}: ${errMsg}`,
-          );
         }
+      } else {
         category = detectCategory(item.relPath);
       }
-    } else {
-      category = detectCategory(item.relPath);
+      const destDirAbs = path.join(outRootAbs, category);
+      const desiredAbs = path.join(destDirAbs, path.basename(item.absPath));
+      const finalAbs = await resolveUniqueDestination(
+        desiredAbs,
+        reservedDestinations,
+      );
+      reservedDestinations.add(finalAbs);
+
+      const toRel = path.relative(targetDir, finalAbs);
+      const samePath = path.resolve(item.absPath) === path.resolve(finalAbs);
+
+      operations.push({
+        from: item.relPath,
+        to: toRel,
+        category,
+        action: samePath ? "skip" : "move",
+        fromAbs: item.absPath,
+        toAbs: finalAbs,
+      });
+    } catch (err) {
+      const errMsg = String(err?.message || err || "");
+      console.error(`${progress} FAILED: ${item.relPath}: ${errMsg}`);
+      failures.push({ file: item.relPath, error: errMsg });
     }
-    const destDirAbs = path.join(outRootAbs, category);
-    const desiredAbs = path.join(destDirAbs, path.basename(item.absPath));
-    const finalAbs = await resolveUniqueDestination(
-      desiredAbs,
-      reservedDestinations,
-    );
-    reservedDestinations.add(finalAbs);
-
-    const toRel = path.relative(targetDir, finalAbs);
-    const samePath = path.resolve(item.absPath) === path.resolve(finalAbs);
-
-    operations.push({
-      from: item.relPath,
-      to: toRel,
-      category,
-      action: samePath ? "skip" : "move",
-      fromAbs: item.absPath,
-      toAbs: finalAbs,
-    });
   }
 
   const toMove = operations.filter((o) => o.action === "move");
@@ -620,18 +627,35 @@ async function main() {
   if (!args.dryRun) {
     console.log(`\nMoving ${toMove.length} files...`);
     const totalToMove = toMove.length;
+    let moved = 0;
     for (const [index, op] of toMove.entries()) {
       const processed = index + 1;
       const remaining = totalToMove - processed;
       const progress = `[${processed}/${totalToMove}, left=${remaining}]`;
-      await fs.mkdir(path.dirname(op.toAbs), { recursive: true });
-      await fs.rename(op.fromAbs, op.toAbs);
-      console.log(`${progress} Moved: ${op.from} -> ${op.to}`);
+      try {
+        await fs.mkdir(path.dirname(op.toAbs), { recursive: true });
+        await fs.rename(op.fromAbs, op.toAbs);
+        moved += 1;
+        console.log(`${progress} Moved: ${op.from} -> ${op.to}`);
 
-      if (args.updateIgnoreList) {
-        const processedPath = op.action === "move" ? op.to : op.from;
-        await appendIgnoreEntries(args.ignoreListPath, [processedPath]);
+        if (args.updateIgnoreList) {
+          const processedPath = op.action === "move" ? op.to : op.from;
+          await appendIgnoreEntries(args.ignoreListPath, [processedPath]);
+        }
+      } catch (err) {
+        console.error(
+          `${progress} MOVE FAILED: ${op.from}: ${err.message || err}`,
+        );
+        failures.push({
+          file: op.from,
+          error: `move failed: ${err.message || err}`,
+        });
       }
+    }
+    if (moved < totalToMove) {
+      console.log(
+        `\nMoved ${moved}/${totalToMove} (${totalToMove - moved} failed)`,
+      );
     }
   } else {
     console.log(`\nDry-run plan (${toMove.length} files to move):`);
@@ -658,6 +682,7 @@ async function main() {
         totalSelected: selected.length,
         totalIgnored: files.length - filesAfterIgnore.length,
         totalMove: toMove.length,
+        totalFailed: failures.length,
         smartMode: args.smart
           ? {
               textModel: args.model,
@@ -666,6 +691,7 @@ async function main() {
             }
           : null,
         operations: operations.map(({ fromAbs, toAbs, ...rest }) => rest),
+        failures: failures.length > 0 ? failures : undefined,
       },
       null,
       2,
@@ -679,10 +705,13 @@ async function main() {
     "utf8",
   );
 
-  console.log(`Scanned: ${files.length}`);
+  console.log(`\nScanned: ${files.length}`);
   console.log(`Ignored by list: ${files.length - filesAfterIgnore.length}`);
   console.log(`Selected: ${selected.length}`);
   console.log(`Move operations: ${toMove.length}`);
+  if (failures.length > 0) {
+    console.log(`Failed: ${failures.length}`);
+  }
   console.log(`Mode: ${args.dryRun ? "dry-run" : "apply"}`);
   console.log(`Out root: ${outRootAbs}`);
   console.log(`JSON: ${jsonPath}`);
