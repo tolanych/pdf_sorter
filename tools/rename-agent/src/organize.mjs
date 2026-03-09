@@ -282,7 +282,7 @@ function buildClassifySystemPrompt(existingFolders = []) {
   lines.push(
     "Folder naming rules:",
     "- snake_case, English, Latin alphabet only",
-    "- 1 to 4 words, short and descriptive",
+    "- 1 to 4 words, max 40 characters total. MUST be a short category name, NOT a sentence or description",
     "- Examples: invoices, tax_declarations, polish_documents, photos_people, utility_bills, bank_statements, identity_documents, contracts, medical_records",
     "",
     "Guidelines:",
