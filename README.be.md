@@ -1,129 +1,37 @@
 [English version](README.md)
 
-# File Rename Agent -- Dakumentacyja
+# File Rename Agent
 
-Інструмент для асэнсаванага перайменавання і арганізацыі PDF-файлаў, фатаграфій дакументаў і іншых файлаў з дапамогай AI (LLM).
+Разумнае перайменаванне і сартыроўка PDF-файлаў, сканаў і фатаграфій дакументаў з дапамогай AI.
 
-Агент чытае змесціва кожнага файла (тэкст або OCR), адпраўляе яго ў моўную мадэль і атрымлівае прапанову новай назвы ў фармаце `<category>_<topic>_<date>.pdf`.
+Агент чытае кожны файл (выцягвае тэкст або запускае OCR), адпраўляе змесціва ў моўную мадэль і прапануе зразумелую назву ў фармаце `category_subject_date.pdf`.
 
-## Хуткія флагі па рэжымах
+**Было:** `IMG_20240315_001.jpg`, `scan0042.pdf`, `Document (3).pdf`
+**Стала:** `invoice_orange_2024-03.jpg`, `certificate_social_insurance_smith_2024-01.pdf`, `lease_agreement_apartment_2024-02.pdf`
 
-Цяпер усе рэжымы выкарыстоўваюць аднолькавыя флагі запуску:
-- `--dry-run` для прагляду (па змаўчанні)
-- `--apply` для рэальных змен
+---
 
-| Рэжым | Каманда | Тыповыя дадатковыя флагі |
+## Як гэта працуе
+
+```
+вашы файлы ──► чытанне тэксту / OCR ──► адпраўка ў LLM ──► новая назва ──► перайменаванне
+```
+
+Тры рэжымы працы:
+
+| Рэжым | Што робіць | Каманда |
 |---|---|---|
-| rename all | `npm run apply -- ...` | `--include`, `--lang`, `--model`, `--limit` |
-| rename па тыпе | `npm run apply:pdf -- ...`, `npm run apply:photos -- ...`, `npm run apply:docs -- ...` | `--model`, `--limit` |
-| organize | `npm run organize -- ...` | `--out-dir`, `--limit` |
-| organize smart | `npm run organize:smart -- ...` | `--model`, `--out-dir`, `--limit` |
+| **Перайменаванне** | Дае файлам зразумелыя назвы | `npm run apply` |
+| **Сартыроўка** | Раскладвае файлы па папках-катэгорыях | `npm run organize` |
+| **Разумная сартыроўка** | Сартуе па змесціву файла праз LLM | `npm run organize:smart` |
 
-Прыклады:
-```bash
-npm run apply -- --target-dir ~/docs --dry-run
-npm run apply:pdf -- --target-dir ~/docs --apply
-npm run organize -- --target-dir ~/docs --dry-run
-npm run organize:smart -- --target-dir ~/docs --apply --model gpt-5-mini
-```
+Усе рэжымы працуюць у **рэжыме прагляду** па змаўчанні (`--dry-run`). Дадайце `--apply` для рэальных змен.
 
 ---
 
-## Змест
+## Хуткі старт
 
-1. [Падтрымліваемыя мадэлі (хутка)](#падтрымліваемыя-мадэлі-хутка)
-2. [Патрабаванні](#патрабаванні)
-3. [Пакрокавы сцэнар (рэкамендаваны)](#пакрокавы-сцэнар-рэкамендаваны)
-4. [Устаноўка і разгортванне](#устаноўка-і-разгортванне)
-5. [Канфігурацыя (.env)](#канфігурацыя-env)
-6. [Запуск перайменавання](#запуск-перайменавання)
-7. [Запуск з рознымі папкамі](#запуск-з-рознымі-папкамі)
-8. [Сартыроўка файлаў па катэгорыях](#сартыроўка-файлаў-па-катэгорыях)
-9. [Чытанне дакументаў (OCR)](#чытанне-дакументаў-ocr)
-10. [Усе параметры каманднага радка](#усе-параметры-каманднага-радка)
-11. [Правілы наймення](#правілы-наймення)
-12. [Вынікі працы](#вынікі-працы)
-13. [Ignore-ліст і працяг працы](#ignore-ліст-і-працяг-працы)
-14. [Прыклады выкарыстання](#прыклады-выкарыстання)
-15. [Пытанні і праблемы](#пытанні-і-праблемы)
-
----
-
-## Падтрымліваемыя мадэлі (хутка)
-
-OpenAI:
-- `gpt-4o`
-- `gpt-4o-mini`
-- `gpt-4.1-2025-04-14`
-- `gpt-4.1-nano`
-- `gpt-5`
-- `gpt-5.1`
-- `gpt-5-mini`
-- `gpt-5-nano`
-
-Google:
-- `gemini-2.5-pro`
-
-Ollama:
-- `llama3.2`
-- `mistral-small3.1`
-- `llama3.3:latest`
-- `gemma3:4b`
-- `gemma3:12b`
-- `gpt-oss:20b`
-
----
-
-## Патрабаванні
-
-### Сістэмныя залежнасці
-
-| Залежнасць | Навошта | macOS | Linux (Ubuntu/Debian) | Windows |
-|---|---|---|---|---|
-| **Node.js** (>=18) | Асноўны рантайм агента | `brew install node` | `sudo apt update && sudo apt install -y nodejs npm` | Усталюйце Node.js LTS з https://nodejs.org |
-| **Python 3.10+** | OCR і чытанне PDF | `brew install python` | `sudo apt install -y python3 python3-venv python3-pip` | Усталюйце Python 3.10+ з https://python.org (адзначце "Add Python to PATH") |
-| **Tesseract OCR** | Распазнаванне тэксту з выяў | `brew install tesseract` | `sudo apt install -y tesseract-ocr` | Усталюйце праз `winget install UB-Mannheim.TesseractOCR` |
-| **Poppler** | Канвертацыя PDF у выявы для OCR | `brew install poppler` | `sudo apt install -y poppler-utils` | Усталюйце праз `winget install oschwartz10612.Poppler` або дадайце `poppler/bin` у PATH уручную |
-
-### Моўныя пакеты Tesseract
-
-Для працы з польскімі, англійскімі і рускімі дакументамі:
-
-```bash
-# macOS
-brew install tesseract-lang
-
-# Linux (Ubuntu/Debian)
-sudo apt install -y tesseract-ocr-eng tesseract-ocr-pol tesseract-ocr-rus
-```
-
-На Windows дадайце патрэбныя моўныя файлы ў ўстаноўку Tesseract і праверце `OCR_LANG` у `.env` (прыклад: `pol+eng+rus`).
-
-### API-ключы (хаця б адзін)
-
-- **OpenAI** -- ключ з https://platform.openai.com
-- **Google Gemini** -- ключ з https://aistudio.google.com
-- **Ollama** -- лакальная мадэль, ключ не патрэбен
-
----
-
-## Пакрокавы сцэнар (рэкамендаваны)
-
-Выкарыстоўвайце гэты парадак для першага запуску:
-
-1. Усталюйце сістэмныя залежнасці з раздзела [Патрабаванні](#патрабаванні) для вашай АС.
-2. Выканайце [Устаноўка і разгортванне](#устаноўка-і-разгортванне) (хуткі або ручны сцэнар).
-3. Запоўніце API-настройкі ў [Канфігурацыя (.env)](#канфігурацыя-env).
-4. Зрабіце бяспечны preview-запуск з [Запуск перайменавання](#запуск-перайменавання) з `--dry-run`.
-5. Запусціце без `--dry-run`, каб прымяніць перайменаванне.
-6. Пры патрэбе зрабіце [Сартыроўка файлаў па катэгорыях](#сартыроўка-файлаў-па-катэгорыях).
-7. Калі ёсць праблемы з OCR/мадэллю, перайдзіце ў [Пытанні і праблемы](#пытанні-і-праблемы).
-
----
-
-## Устаноўка і разгортванне
-
-### Хуткі старт (macOS/Linux)
+### macOS / Linux
 
 ```bash
 git clone <url-рэпазіторыя>
@@ -131,490 +39,255 @@ cd file_rename
 ./setup.sh
 ```
 
-Скрыпт `setup.sh` аўтаматычна:
-1. Стварае Python venv і ўсталёўвае ўсе pip-залежнасці
-2. Усталёўвае Node.js-залежнасці
-3. Стварае `.env` з шаблону і прапісвае правільны `READER_PYTHON`
-
-Пасля гэтага дадайце API-ключ:
+Скрыпт створыць Python-асяроддзе, усталюе ўсе залежнасці і падрыхтуе `.env`. Пасля гэтага дадайце API-ключ:
 
 ```bash
-nano .env
+nano .env    # задайце OPENAI_API_KEY, GOOGLE_GEMINI_API_KEY, або выкарыстоўвайце Ollama (бясплатна)
 ```
 
-Гатова. Можна запускаць:
+Паспрабуйце прагляд:
 
 ```bash
 npm run apply -- --dry-run --target-dir ~/Desktop/documents
 ```
 
-### Хуткі старт (Windows, PowerShell)
-
-`setup.sh` гэта Unix shell-скрыпт, таму на Windows лепш зрабіць ручную ўстаноўку ў PowerShell:
+### Windows (PowerShell)
 
 ```powershell
 git clone <url-рэпазіторыя>
 cd file_rename
 
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install pdfplumber pytesseract Pillow pdf2image PyMuPDF
+.\.venv\Scripts\python.exe -m pip install pdfplumber Pillow PyMuPDF easyocr
 
 npm --prefix tools/rename-agent install
 Copy-Item .env.example .env
 ```
 
-Потым адрэдагуйце `.env`:
-- задайце `READER_PYTHON` як абсалютны шлях, напрыклад `C:\path\to\file_rename\.venv\Scripts\python.exe`
-- дадайце адзін API-ключ (`OPENAI_API_KEY` або `GOOGLE_GEMINI_API_KEY`) або наладзьце Ollama
-
-Першы запуск (preview):
+Адрэдагуйце `.env`: задайце `READER_PYTHON` як поўны шлях (напр. `C:\path\to\file_rename\.venv\Scripts\python.exe`) і дадайце API-ключ.
 
 ```powershell
-npm run apply -- --dry-run --target-dir "C:\Users\<you>\Documents\documents"
-```
-
-### Ручная ўстаноўка (пакрокава)
-
-Калі хочаце зрабіць усё самастойна:
-
-**1. Кланаванне:**
-
-```bash
-git clone <url-рэпазіторыя>
-cd file_rename
-```
-
-**2. Python venv (для OCR):**
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install pdfplumber pytesseract Pillow pdf2image PyMuPDF
-```
-
-Актывацыя (`source .venv/bin/activate`) **не патрэбна** -- каманды можна запускаць праз шлях да Python з venv.
-На Windows выкарыстоўвайце `.\.venv\Scripts\python.exe` замест `.venv/bin/python`.
-
-**3. Node.js-залежнасці:**
-
-```bash
-npm --prefix tools/rename-agent install
-```
-
-**4. Канфігурацыя:**
-
-```bash
-cp .env.example .env
-```
-
-Для Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Адрэдагуйце `.env` -- дадайце API-ключ і задайце `READER_PYTHON`:
-- прыклад macOS/Linux: `/absolute/path/to/file_rename/.venv/bin/python`
-- прыклад Windows: `C:\absolute\path\to\file_rename\.venv\Scripts\python.exe`
-
-**5. Праверка:**
-
-```bash
-.venv/bin/python tools/read_document.py --help
-npm run apply -- --dry-run --limit 1 --target-dir ~/Desktop
-```
-
-Эквівалент для Windows:
-
-```powershell
-.\.venv\Scripts\python.exe tools/read_document.py --help
-npm run apply -- --dry-run --limit 1 --target-dir "C:\Users\<you>\Desktop"
+npm run apply -- --dry-run --target-dir "C:\Users\You\Documents"
 ```
 
 ---
 
-## Канфігурацыя (.env)
+## Бясплатна або з API-ключом
 
-Файл: `.env` (корань праекта)
+| Варыянт | Кошт | Трэба інтэрнэт | Як наладзіць |
+|---|---|---|---|
+| **Ollama** (лакальна) | Бясплатна | Не | Усталюйце [Ollama](https://ollama.com), запусціце `ollama serve`, потым `ollama pull gpt-oss:20b` |
+| **OpenAI** | Платна (API) | Так | Атрымайце ключ на [platform.openai.com](https://platform.openai.com), задайце `OPENAI_API_KEY` у `.env` |
+| **Google Gemini** | Платна (API) | Так | Атрымайце ключ на [aistudio.google.com](https://aistudio.google.com), задайце `GOOGLE_GEMINI_API_KEY` у `.env` |
 
-```env
-# --- Выбар мадэлі ---
-LLM_MODEL=gpt-4o-mini        # опцыянальны агульны default
+З Ollama агент працуе цалкам аўтаномна і бясплатна.
 
-# --- OpenAI ---
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_TIMEOUT_MS=90000
-OPENAI_MAX_RETRIES=2
+### Падтрымліваемыя мадэлі
 
-# --- Ollama (лакальная мадэль) ---
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=gpt-oss:20b
-
-# --- Google Gemini ---
-GOOGLE_GEMINI_API_KEY=...
-GOOGLE_MODEL=gemini-2.5-pro
-
-# --- Агульныя налады ---
-TARGET_DIR=                   # пуста = абавязкова перадаваць --target-dir
-DRY_RUN=true                 # true = толькі прагляд, false = рэальнае перайменаванне
-# rename-flow ignore list (apply)
-RENAME_IGNORE_LIST_PATH=
-# backward-compatible alias for rename-flow ignore list
-IGNORE_LIST_PATH=
-UPDATE_IGNORE_LIST=true
-# organize-flow ignore list (organize / organize:smart)
-ORGANIZE_IGNORE_LIST_PATH=
-ORGANIZE_UPDATE_IGNORE_LIST=true
-
-# --- Мова назваў ---
-NAMING_LANG=en                # en | pl | be | ru
-
-# --- OCR ---
-READER_PYTHON=               # setup.sh запоўніць аўтаматычна
-OCR_LANG=pol+eng+rus          # мовы Tesseract
-
-# --- Smart organize vision model (опцыянальна) ---
-VISION_MODEL=gpt-4o
-# Прыклад для лакальнай Ollama vision-мадэлі:
-# VISION_MODEL=gemma3:4b
-```
-
-`setup.sh` аўтаматычна прапісвае `READER_PYTHON` пры стварэнні `.env` (macOS/Linux). Калі ўсталёўвалі ўручную, задайце абсалютны шлях:
-- macOS/Linux: `<project>/.venv/bin/python`
-- Windows: `<project>\.venv\Scripts\python.exe`
+| Правайдар | Мадэлі |
+|---|---|
+| OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-2025-04-14`, `gpt-4.1-nano`, `gpt-5`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano` |
+| Google | `gemini-2.5-pro` |
+| Ollama | `llama3.2`, `mistral-small3.1`, `llama3.3:latest`, `gemma3:4b`, `gemma3:12b`, `gpt-oss:20b` |
 
 ---
 
-## Запуск перайменавання
+## Выкарыстанне
 
 Усе каманды запускаюцца з кораня праекта.
 
-### Базавая каманда
+### Перайменаванне файлаў
 
 ```bash
-# Прагляд -- што будзе перайменавана (без зменаў)
-npm run apply -- --dry-run --target-dir ~/Desktop/documents
+# Прагляд (бяспечна, без змен)
+npm run apply -- --dry-run --target-dir ~/docs
 
-# Рэальнае перайменаванне
-npm run apply -- --target-dir ~/Desktop/documents --apply
-```
+# Выканаць перайменаванне
+npm run apply -- --target-dir ~/docs --apply
 
-Нагадванне: `npm run apply` па змаўчанні працуе ў `--dry-run`. Для рэальнага перайменавання дадайце `--apply`.
-
-### Выбар мадэлі
-
-```bash
-# OpenAI
+# Выбраць мадэль
 npm run apply -- --target-dir ~/docs --model gpt-4o-mini --apply
 
-# Google Gemini
-npm run apply -- --target-dir ~/docs --model gemini-2.5-pro --apply
+# Лакальная мадэль (без інтэрнэту)
+npm run apply -- --target-dir ~/docs --model llama3.3:latest --apply
 
-# Лакальная мадэль Ollama (без інтэрнэту)
-npm run apply -- --target-dir ~/docs --model gpt-oss:20b --apply
+# Толькі PDF
+npm run apply:pdf -- --target-dir ~/docs --apply
+
+# Толькі фатаграфіі
+npm run apply:photos -- --target-dir ~/docs --apply
+
+# Абмежаваць 10 файламі (добра для тэсту)
+npm run apply -- --target-dir ~/docs --limit 10 --apply
 ```
 
 ### Мова назваў
 
-Па змаўчанні назвы генеруюцца на англійскай мове. Можна змяніць праз `--lang`:
+Па змаўчанні назвы генеруюцца на англійскай. Зменіць праз `--lang`:
 
 ```bash
-# Англійская (па змаўчанні)
-npm run apply -- --target-dir ~/docs --lang en --apply
-
-# Польская
-npm run apply -- --target-dir ~/docs --lang pl --apply
-
-# Беларуская (транслітарацыя)
-npm run apply -- --target-dir ~/docs --lang be --apply
-
-# Руская (транслітарацыя)
-npm run apply -- --target-dir ~/docs --lang ru --apply
+npm run apply -- --target-dir ~/docs --lang pl --apply   # Польская
+npm run apply -- --target-dir ~/docs --lang be --apply   # Беларуская (транслітарацыя)
+npm run apply -- --target-dir ~/docs --lang ru --apply   # Руская (транслітарацыя)
 ```
 
-Або задаць у `.env` каб не перадаваць кожны раз:
+Або задаць адзін раз у `.env`:
 
 ```env
 NAMING_LANG=en
 ```
 
-### Абмежаванне колькасці файлаў
+### Сартыроўка файлаў па папках
 
 ```bash
-# Апрацаваць толькі першыя 10 файлаў (добра для тэсту)
-npm run apply -- --target-dir ~/docs --limit 10 --apply
+# Звычайная сартыроўка (па назве файла)
+npm run organize -- --target-dir ~/docs --apply
+
+# Разумная сартыроўка (чытае змесціва, пытае LLM пра катэгорыю)
+npm run organize:smart -- --target-dir ~/docs --apply
 ```
 
-### Фільтрацыя па тыпе файлаў
-
-Хуткія каманды для пэўных тыпаў:
-
-```bash
-# Толькі PDF
-npm run apply:pdf -- --target-dir ~/docs
-
-# Толькі фатаграфіі (jpg, png, tiff, bmp, webp, gif)
-npm run apply:photos -- --target-dir ~/docs
-
-# Толькі дакументы Word/XML (doc, docx, xml)
-npm run apply:docs -- --target-dir ~/docs
-```
-
-Або праз параметр `--include` з прасэтам ці кастомным glob:
-
-```bash
-# Прасэт
-npm run apply -- --target-dir ~/docs --include pdf --apply
-npm run apply -- --target-dir ~/docs --include photos --apply
-
-# Некалькі прасэтаў разам
-npm run apply -- --target-dir ~/docs --include pdf,photos --apply
-
-# Кастомны glob
-npm run apply -- --target-dir ~/docs --include "**/*.{pdf,png}" --apply
-```
-
-Даступныя прасэты:
-
-| Прасэт | Фарматы |
-|---|---|
-| `all` | pdf, jpg, jpeg, png, tiff, tif, bmp, webp, gif, doc, docx, xml (па змаўчанні) |
-| `pdf` | pdf |
-| `photos` | jpg, jpeg, png, tiff, tif, bmp, webp, gif |
-| `docs` | doc, docx, xml |
-
----
-
-## Запуск з рознымі папкамі
-
-### Параметр `--target-dir`
-
-Перадайце шлях да любой папкі:
-
-```bash
-npm run apply -- --target-dir ~/Desktop/scans --apply
-npm run apply -- --target-dir ~/Documents/invoices --apply
-npm run apply -- --target-dir /Volumes/USB/documents --apply
-```
-
-Прыклад для Windows:
-
-```powershell
-npm run apply -- --target-dir "C:\Users\<you>\Documents\scans" --apply
-```
-
-### Змяненне `TARGET_DIR` у `.env`
-
-Адрэдагуйце `.env`:
-
-```env
-TARGET_DIR=~/Documents/my-docs
-```
-
-Прыклад для Windows:
-
-```env
-TARGET_DIR=C:\Users\<you>\Documents\my-docs
-```
-
-Тады дастаткова проста:
-
-```bash
-npm run apply
-```
-
-### Shell-аліас (для частага выкарыстання)
-
-Гэта зручнасць для Unix shell (`zsh`/`bash`). На Windows зрабіце аналаг праз функцыю/аліас у профілі PowerShell.
-
-Дадайце ў `~/.zshrc` або `~/.bashrc`:
-
-```bash
-alias rename-docs='npm --prefix /шлях/да/праекта/tools/rename-agent run apply --'
-```
-
-Пасля гэтага з любой папкі:
-
-```bash
-rename-docs --target-dir ~/Desktop/scans
-rename-docs --target-dir ~/docs --dry-run --limit 5
-```
-
----
-
-## Сартыроўка файлаў па катэгорыях
-
-Пасля перайменавання можна аўтаматычна рассартаваць файлы па папках-катэгорыях.
-Файлы аўтаматычна разбіваюцца па папках-катэгорыях.
-
-### Звычайная сартыроўка (па назве файла)
-
-```bash
-# Прагляд плана сартыроўкі (без перамяшчэння)
-npm run organize -- --target-dir ~/Desktop/documents --dry-run
-
-# Выканаць сартыроўку
-npm run organize -- --target-dir ~/Desktop/documents --apply
-```
-
-### Разумная сартыроўка (з аналізам кантэнту)
-
-Рэжым `--smart` чытае змесціва кожнага файла (тэкст або OCR) і пытае LLM, у якую катэгорыю яго аднесці. Гэта дазваляе:
-- Правільна класіфікаваць сканы і фатаграфіі дакументаў па іх змесціву
-- Адрозніваць фота людзей ад фота дакументаў
-- Дакладна вызначаць тып, нават калі назва файла неінфарматыўная (напр. `IMG_001.jpg`)
-
-```bash
-# Прагляд (без перамяшчэння)
-npm run organize:smart -- --target-dir ~/Desktop/documents --dry-run
-
-# Выканаць сартыроўку
-npm run organize:smart -- --target-dir ~/Desktop/documents --apply
-
-# З выбарам мадэлі
-npm run organize:smart -- --target-dir ~/docs --apply --model gpt-4o-mini
-```
-
-### Дадатковыя параметры organize
-
-```bash
-# Задаць іншую назву выходной папкі
-npm run organize -- --target-dir ~/docs --apply --out-dir my_sorted
-
-# Абмежаваць колькасць файлаў
-npm run organize -- --target-dir ~/docs --dry-run --limit 50
-```
-
-Вынік -- структура тыпу:
+Вынік:
 
 ```
 sorted_documents/
 ├── invoices/
-│   ├── invoice_orange_2024-03.pdf
-│   └── invoice_pge_2024-05.pdf
 ├── taxes_and_social/
-│   ├── tax_return_pit37_2023.pdf
-│   └── social_insurance_rca_2024-01.pdf
 ├── contracts/
-│   └── contract_lease_warsaw_2024-02.pdf
 └── other/
-    └── unreadable_scan.jpg
+```
+
+### Поўны прыклад працоўнага цыкла
+
+```bash
+# 1. Паглядзець, што будзе перайменавана
+npm run apply -- --dry-run --target-dir ~/Desktop/my-docs
+
+# 2. Перайменаваць
+npm run apply -- --target-dir ~/Desktop/my-docs --apply
+
+# 3. Рассартаваць па папках
+npm run organize -- --target-dir ~/Desktop/my-docs --apply
 ```
 
 ---
 
-## Чытанне дакументаў (OCR)
+## Даведка па камандах
 
-Утыліта `tools/read_document.py` выкарыстоўваецца агентам аўтаматычна, але можна карыстацца ёю і напрамую.
-
-### Запуск
-
-```bash
-# Прачытаць PDF з тэкстам
-.venv/bin/python tools/read_document.py document.pdf
-
-# Распазнаць скан (OCR)
-.venv/bin/python tools/read_document.py scan.jpg
-
-# Прымусовы OCR для PDF
-.venv/bin/python tools/read_document.py document.pdf --mode ocr
-
-# Задаць мовы OCR
-.venv/bin/python tools/read_document.py scan.png --lang pol+eng
-
-# Выбраць старонкі
-.venv/bin/python tools/read_document.py big.pdf --pages 1-3,5
-
-# Захаваць вынік у файл
-.venv/bin/python tools/read_document.py scan.pdf --output result.txt
-```
-
-Альтэрнатыўна -- абалонка `tools/read_doc.sh`, якая сама знаходзіць venv:
-
-```bash
-./tools/read_doc.sh document.pdf
-./tools/read_doc.sh scan.jpg --mode ocr --lang pol+eng
-```
-
-### Рэжымы працы
-
-| Рэжым | Апісанне |
-|---|---|
-| `auto` | Аўтаматычна: калі ў PDF ёсць тэкст -- бярэ яго, інакш -- OCR. Для выяў заўсёды OCR |
-| `text` | Толькі выманне тэксту з PDF (без OCR) |
-| `ocr` | Прымусовае распазнаванне праз Tesseract |
-
-### Падтрымліваемыя фарматы
-
-PDF, JPG/JPEG, PNG, TIFF/TIF, BMP, WebP, GIF, DOC, DOCX, XML
-
----
-
-## Усе параметры каманднага радка
-
-### `npm run apply` (перайменаванне)
+### `npm run apply` — перайменаванне
 
 | Параметр | Апісанне | Змаўчанне |
 |---|---|---|
-| `--target-dir <шлях>` | Папка з файламі для апрацоўкі | з `.env` |
-| `--dry-run` | Толькі прагляд, без перайменавання | |
+| `--target-dir <шлях>` | Папка з файламі | `TARGET_DIR` з `.env` |
+| `--dry-run` | Толькі прагляд, без змен | *(па змаўчанні)* |
 | `--apply` | Выканаць перайменаванне | |
-| `--model <назва>` | Мадэль LLM з whitelist | `LLM_MODEL` або аўта-выбар па даступных ключах (`gpt-oss:20b` як fallback) |
-| `--ollama-base-url <url>` | URL сервера Ollama | `http://localhost:11434` |
-| `--include <прасэт\|glob>` | Фільтр тыпаў файлаў: `pdf`, `photos`, `docs`, `all` або glob | `all` |
+| `--model <назва>` | Мадэль LLM | аўта-выбар па ключах у `.env` |
+| `--include <прасэт\|glob>` | Фільтр: `pdf`, `photos`, `docs`, `all` або glob | `all` |
 | `--lang <код>` | Мова назваў: `en`, `pl`, `be`, `ru` | `en` |
-| `--limit <N>` | Апрацаваць толькі першыя N файлаў | `0` (усе) |
-| `--ignore-list <шлях>` | Шлях да rename ignore-ліста | `<project-root>/.rename-agent-ignore-rename.txt` |
-| `--no-update-ignore-list` | Не абнаўляць ignore-ліст | абнаўляць |
+| `--limit <N>` | Апрацаваць толькі першыя N файлаў | усе |
+| `--ignore-list <шлях>` | Свой шлях да ignore-ліста | `.rename-agent-ignore-rename.txt` |
+| `--no-update-ignore-list` | Не абнаўляць ignore-ліст | |
+| `--ollama-base-url <url>` | URL сервера Ollama | `http://localhost:11434` |
 
-### `npm run organize` (сартыроўка)
+Хуткія каманды: `npm run apply:pdf`, `npm run apply:photos`, `npm run apply:docs`.
 
-| Параметр | Апісанне | Змаўчанне |
-|---|---|---|
-| `--target-dir <шлях>` | Папка з файламі | з `.env` |
-| `--dry-run` | Толькі прагляд | |
-| `--apply` | Выканаць перамяшчэнне | |
-| `--out-dir <назва>` | Назва папкі для сартыроўкі | `sorted_documents` |
-| `--smart` | Разумная сартыроўка: аналіз кантэнту праз LLM | выключана |
-| `--model <назва>` | Мадэль LLM (для `--smart`) | тыя ж default, што і для `apply` |
-| `--limit <N>` | Абмежаваць колькасць файлаў | `0` (усе) |
-| `--ignore-list <шлях>` | Шлях да organize ignore-ліста | `<project-root>/.rename-agent-ignore-organize.txt` |
-| `--no-update-ignore-list` | Не абнаўляць organize ignore-ліст | абнаўляць |
-
-### `.venv/bin/python tools/read_document.py` (чытанне)
+### `npm run organize` — сартыроўка
 
 | Параметр | Апісанне | Змаўчанне |
 |---|---|---|
-| `file` | Шлях да файла | (абавязковы) |
-| `--mode` | `text`, `ocr`, `auto` | `auto` |
-| `--lang` | Мовы OCR | `pol+eng+rus` |
-| `--pages` | Дыяпазон старонак (напр. `1-3,5`) | усе |
+| `--target-dir <шлях>` | Папка з файламі | `TARGET_DIR` з `.env` |
+| `--dry-run` | Толькі прагляд | *(па змаўчанні)* |
+| `--apply` | Выканаць сартыроўку | |
+| `--smart` | Аналіз змесціва праз LLM | выкл. |
+| `--model <назва>` | Мадэль LLM (для `--smart`) | як у `apply` |
+| `--out-dir <назва>` | Назва выходной папкі | `sorted_documents` |
+| `--limit <N>` | Апрацаваць толькі першыя N файлаў | усе |
+| `--ignore-list <шлях>` | Свой шлях да ignore-ліста | `.rename-agent-ignore-organize.txt` |
+| `--no-update-ignore-list` | Не абнаўляць ignore-ліст | |
+
+Хуткая каманда: `npm run organize:smart` = `npm run organize -- --smart`.
+
+### `read_document.py` — чытанне / OCR
+
+```bash
+.venv/bin/python tools/read_document.py <файл> [опцыі]
+```
+
+| Параметр | Апісанне | Змаўчанне |
+|---|---|---|
+| `file` | Шлях да файла (PDF, JPG, PNG, ...) | *(абавязковы)* |
+| `--mode` | `auto`, `text`, `ocr` | `auto` |
+| `--lang` | Мовы OCR (коды EasyOCR, праз коску) | `en,ru,be,uk` |
+| `--pages` | Дыяпазон старонак, напр. `1-3,5` | усе |
 | `--dpi` | DPI для рэндэрынгу | `300` |
 | `--output` / `-o` | Захаваць у файл | stdout |
+| `--smart-pages` | Аўта-выбар старонак для доўгіх PDF | выкл. |
+
+Shell-абалонка (сама знаходзіць venv): `./tools/read_doc.sh <файл> [опцыі]`
 
 ---
 
-## Правілы наймення
+## Канфігурацыя (.env)
 
-Агент генеруе назвы паводле правілаў з файла `tools/rename-agent/rules.prompt.txt`:
+Файл `.env` у корані праекта кіруе ўсімі наладамі. Ствараецца аўтаматычна праз `setup.sh` або ўручную з `.env.example`.
 
-- Мова: **англійская**, лацінскі алфавіт, snake_case
-- Фармат: `<category>_<topic>_<date>` у **snake_case**
-- Прыклады катэгорый: `invoice`, `tax_return`, `vat`, `social_insurance`, `bank_statement`, `residence_permit`, `contract`, `certificate`, `power_of_attorney`, `application`, `photo`, `scan`, `report`
-- Дата (калі вядомая): `YYYY-MM` або `YYYY-MM-DD`
-- Калі ў дакуменце ёсць асоба (пашпарт, дазвол) -- прозвішча дадаецца ў назву
-- Нечытэльныя сканы: `unreadable_scan`
-- Пашырэнне файла не змяняецца
+Асноўныя налады:
 
-### Прыклады перайменавання
+```env
+# Мадэль (апцыянальна — вызначаецца аўтаматычна па даступных ключах)
+LLM_MODEL=gpt-4o-mini
 
-| Было | Стала |
-|---|---|
-| `IMG_20240315_001.jpg` | `invoice_orange_2024-03.jpg` |
-| `scan0042.pdf` | `certificate_social_insurance_kowalski_2024-01.pdf` |
-| `Document (3).pdf` | `contract_lease_warsaw_2024-02.pdf` |
-| `photo_2024.png` | `residence_permit_card_ivanov_2024-05.png` |
-| `file.pdf` (нечытэльны) | `unreadable_scan.pdf` |
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# Ollama (лакальна, бясплатна)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=gpt-oss:20b
+
+# Google Gemini
+GOOGLE_GEMINI_API_KEY=...
+
+# Мэтавая папка (або перадавайце --target-dir кожны раз)
+TARGET_DIR=
+
+# Мова назваў: en | pl | be | ru
+NAMING_LANG=en
+
+# Шлях да Python (setup.sh задае аўтаматычна)
+READER_PYTHON=.venv/bin/python
+
+# Мовы OCR (коды EasyOCR, праз коску)
+OCR_LANG=en,ru,be,uk
+
+# Vision-мадэль для organize:smart (апцыянальна)
+VISION_MODEL=gpt-4o
+```
+
+Прыярытэт мадэлі: `LLM_MODEL` > `OPENAI_MODEL` (калі ёсць ключ) > `OLLAMA_MODEL` > `GOOGLE_MODEL` (калі ёсць ключ) > `gpt-oss:20b` як fallback.
+
+---
+
+## Ignore-лісты
+
+Агент запамінае апрацаваныя файлы, каб можна было спыніцца і працягнуць у любы момант.
+
+Два асобныя спісы (у корані праекта):
+- `.rename-agent-ignore-rename.txt` — для перайменавання (`apply`)
+- `.rename-agent-ignore-organize.txt` — для сартыроўкі (`organize`)
+
+Што гэта значыць:
+- **Бяспечна спыніць і працягнуць** — запусціце каманду зноў, і будуць апрацаваны толькі новыя файлы
+- **Пераапрацаваць усё** — выдаліце ignore-файл і запусціце зноў
+- **Разавы запуск** — дадайце `--no-update-ignore-list`
+
+```bash
+# Працягнуць з месца спынення
+npm run apply -- --target-dir ~/docs --apply
+
+# Прымусовая пераапрацоўка
+rm .rename-agent-ignore-rename.txt
+npm run apply -- --target-dir ~/docs --apply
+```
 
 ---
 
@@ -625,179 +298,158 @@ PDF, JPG/JPEG, PNG, TIFF/TIF, BMP, WebP, GIF, DOC, DOCX, XML
 | Файл | Апісанне |
 |---|---|
 | `rename-plan.json` | Поўны план перайменавання з метаданымі |
-| `rename-plan.csv` | CSV-версія плана (для Excel / Google Sheets) |
-| `pending-files.txt` | Спіс файлаў, якія чакаюць апрацоўкі |
-| `organize-plan.json` | План сартыроўкі па папках |
+| `rename-plan.csv` | CSV-версія (для Excel / Google Sheets) |
+| `pending-files.txt` | Файлы, якія чакаюць апрацоўкі |
+| `organize-plan.json` | План сартыроўкі |
 | `organize-plan.csv` | CSV-версія плана сартыроўкі |
 
-Дадаткова:
-
-- У мэтавай папцы: **`DOCUMENT_CATALOG.md`** -- аўтаматычна абнаўляемы каталог усіх файлаў
-- У корані праекта: **`.rename-agent-ignore-rename.txt`** -- спіс ужо перайменаваных файлаў
-- У корані праекта: **`.rename-agent-ignore-organize.txt`** -- спіс ужо адсартыраваных файлаў
+Дадаткова ў мэтавай папцы ствараецца `DOCUMENT_CATALOG.md` — аўтаматычна абнаўляемы каталог усіх файлаў.
 
 ---
 
-## Ignore-ліст і працяг працы
+## Правілы наймення
 
-Агент выкарыстоўвае два ignore-лісты ў корані праекта:
+Назвы генеруюцца паводле правілаў з `tools/rename-agent/rules.prompt.txt`:
 
-- `.rename-agent-ignore-rename.txt` для патоку перайменавання (`apply`)
-- `.rename-agent-ignore-organize.txt` для патоку сартыроўкі (`organize`, `organize:smart`)
+- **Фармат:** `category_subject_date` у snake_case
+- **Мова:** англійская, лацінскі алфавіт (па змаўчанні)
+- **Дата:** `YYYY-MM` або `YYYY-MM-DD` (калі знойдзена ў дакуменце)
+- **Людзі:** прозвішча дадаецца для пашпартоў, дазволаў, сертыфікатаў
+- **Нечытэльныя:** `unreadable_scan`
+- **Пашырэнне:** ніколі не змяняецца
 
-Гэта значыць:
+Прыклады катэгорый: `invoice`, `tax_return`, `bank_statement`, `contract`, `certificate`, `residence_permit`, `passport`, `application`, `scan`, `report`.
 
-1. **Можна бяспечна спыніць і працягнуць** -- пры паўторным запуску агент прапусціць ужо апрацаваныя файлы
-2. **Новыя файлы аўтаматычна падхопяцца** -- дастаткова запусціць агент зноў
-3. **Каб пераапрацаваць усё** -- выдаліце адзін або абодва ignore-файлы з кораня праекта
-
-```bash
-# Працягнуць з месца спынення
-npm run apply -- --target-dir ~/docs --apply
-
-# Прымусіць пераапрацоўку ўсіх файлаў
-rm ./.rename-agent-ignore-rename.txt
-rm ./.rename-agent-ignore-organize.txt
-npm run apply -- --target-dir ~/docs --apply
-
-# Не абнаўляць ignore-ліст (разавы прагон)
-npm run apply -- --target-dir ~/docs --no-update-ignore-list --apply
-```
+| Было | Стала |
+|---|---|
+| `IMG_20240315_001.jpg` | `invoice_orange_2024-03.jpg` |
+| `scan0042.pdf` | `certificate_social_insurance_smith_2024-01.pdf` |
+| `Document (3).pdf` | `lease_agreement_apartment_2024-02.pdf` |
+| `photo_2024.png` | `residence_permit_card_ivanov_2024-05.png` |
+| `file.pdf` (нечытэльны) | `unreadable_scan.pdf` |
 
 ---
 
-## Прыклады выкарыстання
+## Падтрымліваемыя фарматы файлаў
 
-### Прыклад 1: Першы запуск -- прагляд
+PDF, JPG/JPEG, PNG, TIFF/TIF, BMP, WebP, GIF, DOC, DOCX, XML
 
-Спачатку заўсёды глядзім, што агент прапануе:
+Прасэты для `--include`:
 
-```bash
-npm run apply -- --dry-run --target-dir ~/Desktop/documents
-```
+| Прасэт | Фарматы |
+|---|---|
+| `all` | усе пералічаныя *(па змаўчанні)* |
+| `pdf` | толькі PDF |
+| `photos` | JPG, JPEG, PNG, TIFF, TIF, BMP, WebP, GIF |
+| `docs` | DOC, DOCX, XML |
 
-Вывад пакажа для кожнага файла прапанаваную назву, тып, дату і ўзровень упэўненасці. Рэальныя файлы не будуць зменены.
+Можна перадаць кастомны glob: `--include "**/*.{pdf,png}"`.
 
-### Прыклад 2: Перайменаваць усе дакументы
+---
 
-```bash
-npm run apply -- --target-dir ~/Desktop/documents --apply
-```
+## Сістэмныя патрабаванні
 
-### Прыклад 3: Тэст на невялікай выбарцы
+| Залежнасць | Навошта | macOS | Linux (Ubuntu/Debian) | Windows |
+|---|---|---|---|---|
+| **Node.js >=18** | Рантайм агента | `brew install node` | `sudo apt install -y nodejs npm` | [nodejs.org](https://nodejs.org) LTS |
+| **Python 3.10+** | OCR і чытанне PDF | `brew install python` | `sudo apt install -y python3 python3-venv python3-pip` | [python.org](https://python.org) (адзначце "Add to PATH") |
 
-```bash
-npm run apply -- --target-dir ~/Desktop/documents --limit 5 --dry-run
-```
+OCR рэалізаваны праз **EasyOCR** (усталёўваецца праз pip, сістэмныя OCR-пакеты не патрэбны).
 
-### Прыклад 4: Выкарыстанне лакальнай мадэлі (без інтэрнэту)
+### Ручная ўстаноўка (пакрокава)
 
-```bash
-# Спачатку запусціце Ollama:
-ollama serve
-
-# Потым:
-npm run apply -- --target-dir ~/docs --model llama3.3:latest --apply
-```
-
-### Прыклад 5: Поўны цыкл -- перайменаванне + сартыроўка
+Калі не хочаце выкарыстоўваць `setup.sh`:
 
 ```bash
-# Крок 1: Перайменаваць
-npm run apply -- --target-dir ~/Desktop/my-docs --apply
+# 1. Кланаванне
+git clone <url-рэпазіторыя>
+cd file_rename
 
-# Крок 2: Пабачыць план сартыроўкі
-npm run organize -- --target-dir ~/Desktop/my-docs --dry-run
+# 2. Python venv
+python3 -m venv .venv
+.venv/bin/pip install pdfplumber Pillow PyMuPDF easyocr
 
-# Крок 3: Рассартаваць
-npm run organize -- --target-dir ~/Desktop/my-docs --apply
+# 3. Node.js-залежнасці
+npm --prefix tools/rename-agent install
+
+# 4. Канфігурацыя
+cp .env.example .env
+# Адрэдагуйце .env — дадайце API-ключ, задайце READER_PYTHON як абсалютны шлях
+
+# 5. Праверка
+.venv/bin/python tools/read_document.py --help
+npm run apply -- --dry-run --limit 1 --target-dir ~/Desktop
 ```
 
-### Прыклад 6: Апрацоўка знешняга дыска
+На Windows замяніце `.venv/bin/python` на `.\.venv\Scripts\python.exe` і `cp` на `Copy-Item`.
+
+---
+
+## Парады
+
+**Праца з рознымі папкамі:**
 
 ```bash
-npm run apply -- --target-dir /Volumes/MyUSB/scans --model gpt-4o-mini --apply
+# Перадайце шлях напрамую
+npm run apply -- --target-dir /Volumes/USB/scans --apply
+
+# Або задайце ў .env, каб не набіраць кожны раз
+# TARGET_DIR=~/Documents/my-docs
 ```
 
-### Прыклад 7: Прачытаць адзін дакумент уручную
+**Shell-аліас** (macOS/Linux) для частага выкарыстання:
 
 ```bash
-.venv/bin/python tools/read_document.py ~/Desktop/scan.pdf
+# Дадайце ў ~/.zshrc або ~/.bashrc:
+alias rename-docs='npm --prefix /шлях/да/file_rename run apply --'
 
-# Або праз абалонку (яна сама знойдзе venv):
-./tools/read_doc.sh ~/Desktop/scan.pdf
+# Потым з любой папкі:
+rename-docs --target-dir ~/Desktop/scans --apply
 ```
 
-### Прыклад 8: Шматразовая апрацоўка новых файлаў
-
-```bash
-# Першы запуск -- апрацуе ўсе файлы
-npm run apply -- --target-dir ~/docs --apply
-
-# Пазней дадалі новыя файлы ў ~/docs -- запускаем зноў
-# Агент апрацуе толькі новыя (дзякуючы ignore-лісту)
-npm run apply -- --target-dir ~/docs --apply
-```
+**Апрацоўка новых файлаў** — проста запусціце тую ж каманду зноў. Ignore-ліст гарантуе, што апрацуюцца толькі новыя файлы.
 
 ---
 
 ## Пытанні і праблемы
 
-### «unreadable_scan» у многіх файлах
+### «unreadable_scan» для многіх файлаў
 
-OCR не змог распазнаць тэкст. Магчымыя прычыны:
-- Tesseract не ўсталяваны або не мае патрэбных моўных пакетаў
-- Нізкая якасць сканаў
-- Дакумент на мове, якая не ўключана ў `OCR_LANG`
-
-Рашэнне: `brew install tesseract-lang` і праверце `OCR_LANG` у `.env`.
-Таксама ўсталюйце моўныя пакеты для вашай АС:
-- macOS: `brew install tesseract-lang`
-- Linux (Ubuntu/Debian): `sudo apt install -y tesseract-ocr-eng tesseract-ocr-pol tesseract-ocr-rus`
-- Windows: дадайце `eng`, `pol`, `rus` файлы даных у тэчку ўстаноўкі Tesseract
+OCR не змог распазнаць тэкст. Праверце:
+- У Python venv ёсць EasyOCR: `.venv/bin/python -c "import easyocr; print('OK')"`
+- `OCR_LANG` у `.env` утрымлівае патрэбныя мовы (напр. `en,ru,be,uk`)
+- Якасць сканаў дастатковая
 
 ### Агент не бачыць файлы
 
-Праверце, што:
 - `--target-dir` паказвае на правільную папку
-- Файлы маюць падтрымліваемае пашырэнне (pdf, jpg, png, tiff, doc, docx, xml)
-- Файлы не ў root ignore-файлах (`.rename-agent-ignore-rename.txt` / `.rename-agent-ignore-organize.txt`)
+- Файлы маюць падтрымліваемае пашырэнне
+- Файлы не ў ignore-лісце (`.rename-agent-ignore-rename.txt`)
 
-### Памылка LLM/мадэлі
+### Памылка LLM / мадэлі
 
-- **OpenAI**: праверце `OPENAI_API_KEY` у `.env`
-- **Ollama**: пераканайцеся, што `ollama serve` запушчаны
-- **Google**: праверце `GOOGLE_GEMINI_API_KEY`
-- **Unsupported model**: выкарыстоўвайце толькі мадэлі са спісу `Model` у `tools/rename-agent/src/llm.mjs`
+- **OpenAI:** праверце `OPENAI_API_KEY` у `.env`
+- **Ollama:** пераканайцеся, што `ollama serve` запушчаны
+- **Google:** праверце `GOOGLE_GEMINI_API_KEY`
+- **Unsupported model:** выкарыстоўвайце толькі мадэлі з [спісу](#падтрымліваемыя-мадэлі)
 
 ### Python не знойдзены
 
-Агент шукае Python у наступным парадку:
-
-1. `READER_PYTHON` з `.env` (`setup.sh` прапісвае аўтаматычна)
-2. `.venv/bin/python` у корані праекта (знаходзіць аўтаматычна)
-3. сістэмны `python3` (фолбэк, можа не мець патрэбных бібліятэк)
+Агент шукае Python у такім парадку:
+1. `READER_PYTHON` з `.env` (задаецца `setup.sh`)
+2. `.venv/bin/python` у корані праекта
+3. Сістэмны `python3` (фолбэк)
 
 Праверыць, што venv працуе:
 
 ```bash
-.venv/bin/python -c "import pdfplumber, pytesseract, fitz; print('OK')"
+.venv/bin/python -c "import pdfplumber, easyocr, fitz; print('OK')"
 ```
 
-Эквівалент для Windows:
-
-```powershell
-.\.venv\Scripts\python.exe -c "import pdfplumber, pytesseract, fitz; print('OK')"
-```
-
-Калі нешта не ўсталявана -- даўсталюйце:
+Калі нешта адсутнічае:
 
 ```bash
-.venv/bin/pip install pdfplumber pytesseract Pillow pdf2image PyMuPDF
+.venv/bin/pip install pdfplumber Pillow PyMuPDF easyocr
 ```
 
-Эквівалент для Windows:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install pdfplumber pytesseract Pillow pdf2image PyMuPDF
-```
+На Windows: выкарыстоўвайце `.\.venv\Scripts\python.exe` замест `.venv/bin/python`.

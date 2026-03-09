@@ -1,129 +1,37 @@
-[Belarusian version / Беларуская версія](README.be.md)
+[Беларуская версія](README.be.md)
 
-# File Rename Agent -- Documentation
+# File Rename Agent
 
-A tool for intelligent renaming and organization of PDF files, document photos, and other files using AI (LLM).
+Intelligent renaming and sorting of PDF files, document scans, and photos using AI.
 
-The agent reads the content of each file (text or OCR), sends it to a language model, and receives a suggested new name in the format `<category>_<subject>_<date>.pdf`.
+The agent reads each file (extracts text or runs OCR), sends the content to a language model, and suggests a clean name in the format `category_subject_date.pdf`.
 
-## Quick Flags By Mode
+**Before:** `IMG_20240315_001.jpg`, `scan0042.pdf`, `Document (3).pdf`
+**After:** `invoice_orange_2024-03.jpg`, `certificate_social_insurance_smith_2024-01.pdf`, `lease_agreement_apartment_2024-02.pdf`
 
-All modes now use the same execution flags:
-- `--dry-run` for preview (default)
-- `--apply` for real changes
+---
 
-| Mode | Command | Typical extra flags |
+## How It Works
+
+```
+your files ──► read text / OCR ──► send to LLM ──► get new name ──► rename
+```
+
+Three modes of operation:
+
+| Mode | What it does | Command |
 |---|---|---|
-| rename all | `npm run apply -- ...` | `--include`, `--lang`, `--model`, `--limit` |
-| rename by type | `npm run apply:pdf -- ...`, `npm run apply:photos -- ...`, `npm run apply:docs -- ...` | `--model`, `--limit` |
-| organize | `npm run organize -- ...` | `--out-dir`, `--limit` |
-| organize smart | `npm run organize:smart -- ...` | `--model`, `--out-dir`, `--limit` |
+| **Rename** | Gives files meaningful names | `npm run apply` |
+| **Organize** | Sorts files into category folders | `npm run organize` |
+| **Organize smart** | Sorts by analyzing file content via LLM | `npm run organize:smart` |
 
-Examples:
-```bash
-npm run apply -- --target-dir ~/docs --dry-run
-npm run apply:pdf -- --target-dir ~/docs --apply
-npm run organize -- --target-dir ~/docs --dry-run
-npm run organize:smart -- --target-dir ~/docs --apply --model gpt-5-mini
-```
+All modes work in **preview mode by default** (`--dry-run`). Add `--apply` to make real changes.
 
 ---
 
-## Table of Contents
+## Quick Start
 
-1. [Supported Models (Quick)](#supported-models-quick)
-2. [Requirements](#requirements)
-3. [Step-by-Step Workflow (Recommended)](#step-by-step-workflow-recommended)
-4. [Installation and Setup](#installation-and-setup)
-5. [Configuration (.env)](#configuration-env)
-6. [Running the Renamer](#running-the-renamer)
-7. [Running with Different Folders](#running-with-different-folders)
-8. [Sorting Files by Category](#sorting-files-by-category)
-9. [Reading Documents (OCR)](#reading-documents-ocr)
-10. [All Command-Line Parameters](#all-command-line-parameters)
-11. [Naming Rules](#naming-rules)
-12. [Output Files](#output-files)
-13. [Ignore List and Resuming Work](#ignore-list-and-resuming-work)
-14. [Usage Examples](#usage-examples)
-15. [Questions and Troubleshooting](#questions-and-troubleshooting)
-
----
-
-## Supported Models (Quick)
-
-OpenAI:
-- `gpt-4o`
-- `gpt-4o-mini`
-- `gpt-4.1-2025-04-14`
-- `gpt-4.1-nano`
-- `gpt-5`
-- `gpt-5.1`
-- `gpt-5-mini`
-- `gpt-5-nano`
-
-Google:
-- `gemini-2.5-pro`
-
-Ollama:
-- `llama3.2`
-- `mistral-small3.1`
-- `llama3.3:latest`
-- `gemma3:4b`
-- `gemma3:12b`
-- `gpt-oss:20b`
-
----
-
-## Requirements
-
-### System Dependencies
-
-| Dependency | Purpose | macOS | Linux (Ubuntu/Debian) | Windows |
-|---|---|---|---|---|
-| **Node.js** (>=18) | Main agent runtime | `brew install node` | `sudo apt update && sudo apt install -y nodejs npm` | Install Node.js LTS from https://nodejs.org |
-| **Python 3.10+** | OCR and PDF reading | `brew install python` | `sudo apt install -y python3 python3-venv python3-pip` | Install Python 3.10+ from https://python.org (check "Add Python to PATH") |
-| **Tesseract OCR** | Text recognition from images | `brew install tesseract` | `sudo apt install -y tesseract-ocr` | Install via `winget install UB-Mannheim.TesseractOCR` |
-| **Poppler** | Converting PDF to images for OCR | `brew install poppler` | `sudo apt install -y poppler-utils` | Install via `winget install oschwartz10612.Poppler` or add `poppler/bin` to PATH manually |
-
-### Tesseract Language Packs
-
-For working with English, Polish, and Russian documents:
-
-```bash
-# macOS
-brew install tesseract-lang
-
-# Linux (Ubuntu/Debian)
-sudo apt install -y tesseract-ocr-eng tesseract-ocr-pol tesseract-ocr-rus
-```
-
-On Windows, install additional language data in your Tesseract installation and set `OCR_LANG` in `.env` (example: `pol+eng+rus`).
-
-### API Keys (at least one)
-
-- **OpenAI** -- key from https://platform.openai.com
-- **Google Gemini** -- key from https://aistudio.google.com
-- **Ollama** -- local model, no key required
-
----
-
-## Step-by-Step Workflow (Recommended)
-
-Use this order if you run the tool for the first time:
-
-1. Install system dependencies from [Requirements](#requirements) for your OS.
-2. Run [Installation and Setup](#installation-and-setup) (quick start or manual).
-3. Fill in API settings in [Configuration (.env)](#configuration-env).
-4. Do a safe preview run from [Running the Renamer](#running-the-renamer) with `--dry-run`.
-5. Run without `--dry-run` to apply renaming.
-6. Optionally run [Sorting Files by Category](#sorting-files-by-category).
-7. If OCR/model issues appear, check [Questions and Troubleshooting](#questions-and-troubleshooting).
-
----
-
-## Installation and Setup
-
-### Quick Start (macOS/Linux)
+### macOS / Linux
 
 ```bash
 git clone <repository-url>
@@ -131,482 +39,286 @@ cd file_rename
 ./setup.sh
 ```
 
-The `setup.sh` script automatically:
-1. Creates a Python venv and installs all pip dependencies
-2. Installs Node.js dependencies
-3. Creates `.env` from a template and sets the correct `READER_PYTHON`
-
-After that, add your API key:
+The script creates a Python virtual environment, installs all dependencies, and prepares `.env`. After that, add your API key:
 
 ```bash
-nano .env
+nano .env    # set OPENAI_API_KEY, GOOGLE_GEMINI_API_KEY, or use Ollama (free)
 ```
 
-Done. You can now run:
+Try a preview:
 
 ```bash
 npm run apply -- --dry-run --target-dir ~/Desktop/documents
 ```
 
-### Quick Start (Windows, PowerShell)
-
-`setup.sh` is a Unix shell script, so on Windows use manual setup in PowerShell:
+### Windows (PowerShell)
 
 ```powershell
 git clone <repository-url>
 cd file_rename
 
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install pdfplumber pytesseract Pillow pdf2image PyMuPDF
+.\.venv\Scripts\python.exe -m pip install pdfplumber Pillow PyMuPDF easyocr
 
 npm --prefix tools/rename-agent install
 Copy-Item .env.example .env
 ```
 
-Then edit `.env`:
-- set `READER_PYTHON` to the absolute path, for example `C:\path\to\file_rename\.venv\Scripts\python.exe`
-- add one API key (`OPENAI_API_KEY` or `GOOGLE_GEMINI_API_KEY`) or configure Ollama
-
-First run (preview):
+Edit `.env`: set `READER_PYTHON` to the full path (e.g. `C:\path\to\file_rename\.venv\Scripts\python.exe`) and add an API key.
 
 ```powershell
-npm run apply -- --dry-run --target-dir "C:\Users\<you>\Documents\documents"
-```
-
-### Manual Installation (step by step)
-
-If you want to do everything yourself:
-
-**1. Clone:**
-
-```bash
-git clone <repository-url>
-cd file_rename
-```
-
-**2. Python venv (for OCR):**
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install pdfplumber pytesseract Pillow pdf2image PyMuPDF
-```
-
-Activation (`source .venv/bin/activate`) is **not required** -- commands can use the venv Python path directly.
-On Windows, use `.\.venv\Scripts\python.exe` instead of `.venv/bin/python`.
-
-**3. Node.js dependencies:**
-
-```bash
-npm --prefix tools/rename-agent install
-```
-
-**4. Configuration:**
-
-```bash
-cp .env.example .env
-```
-
-On Windows PowerShell, use:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Edit `.env` -- add your API key and set `READER_PYTHON`:
-- macOS/Linux example: `/absolute/path/to/file_rename/.venv/bin/python`
-- Windows example: `C:\absolute\path\to\file_rename\.venv\Scripts\python.exe`
-
-**5. Verification:**
-
-```bash
-.venv/bin/python tools/read_document.py --help
-npm run apply -- --dry-run --limit 1 --target-dir ~/Desktop
-```
-
-Windows equivalent:
-
-```powershell
-.\.venv\Scripts\python.exe tools/read_document.py --help
-npm run apply -- --dry-run --limit 1 --target-dir "C:\Users\<you>\Desktop"
+npm run apply -- --dry-run --target-dir "C:\Users\You\Documents"
 ```
 
 ---
 
-## Configuration (.env)
+## Free vs Paid Models
 
-File: `.env` (project root)
+| Option | Cost | Needs internet | Setup |
+|---|---|---|---|
+| **Ollama** (local) | Free | No | Install [Ollama](https://ollama.com), run `ollama serve`, then `ollama pull gpt-oss:20b` |
+| **OpenAI** | Paid (API) | Yes | Get a key at [platform.openai.com](https://platform.openai.com), set `OPENAI_API_KEY` in `.env` |
+| **Google Gemini** | Paid (API) | Yes | Get a key at [aistudio.google.com](https://aistudio.google.com), set `GOOGLE_GEMINI_API_KEY` in `.env` |
 
-```env
-# --- Model selection ---
-LLM_MODEL=gpt-4o-mini        # optional global default
+With Ollama, the agent works entirely offline and free of charge.
 
-# --- OpenAI ---
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_TIMEOUT_MS=90000
-OPENAI_MAX_RETRIES=2
+### Supported Models
 
-# --- Ollama (local model) ---
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=gpt-oss:20b
-
-# --- Google Gemini ---
-GOOGLE_GEMINI_API_KEY=...
-GOOGLE_MODEL=gemini-2.5-pro
-
-# --- General Settings ---
-TARGET_DIR=                   # empty = must pass --target-dir
-DRY_RUN=true                 # true = preview only, false = actual renaming
-# rename-flow ignore list (apply)
-RENAME_IGNORE_LIST_PATH=
-# backward-compatible alias for rename-flow ignore list
-IGNORE_LIST_PATH=
-UPDATE_IGNORE_LIST=true
-# organize-flow ignore list (organize / organize:smart)
-ORGANIZE_IGNORE_LIST_PATH=
-ORGANIZE_UPDATE_IGNORE_LIST=true
-
-# --- Naming Language ---
-NAMING_LANG=en                # en | pl | be | ru
-
-# --- OCR ---
-READER_PYTHON=               # setup.sh fills this automatically
-OCR_LANG=pol+eng+rus          # Tesseract languages
-
-# --- Smart organize vision model (optional) ---
-VISION_MODEL=gpt-4o
-# Example for local Ollama vision:
-# VISION_MODEL=gemma3:4b
-```
-
-`setup.sh` automatically sets `READER_PYTHON` when creating `.env` (macOS/Linux). If you installed manually, set an absolute path:
-- macOS/Linux: `<project>/.venv/bin/python`
-- Windows: `<project>\.venv\Scripts\python.exe`
+| Provider | Models |
+|---|---|
+| OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-2025-04-14`, `gpt-4.1-nano`, `gpt-5`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano` |
+| Google | `gemini-2.5-pro` |
+| Ollama | `llama3.2`, `mistral-small3.1`, `llama3.3:latest`, `gemma3:4b`, `gemma3:12b`, `gpt-oss:20b` |
 
 ---
 
-## Running the Renamer
+## Usage
 
 All commands are run from the project root.
 
-### Basic Command
+### Renaming Files
 
 ```bash
-# Preview -- what will be renamed (no changes made)
-npm run apply -- --dry-run --target-dir ~/Desktop/documents
+# Preview (safe, no changes)
+npm run apply -- --dry-run --target-dir ~/docs
 
-# Actual renaming
-npm run apply -- --target-dir ~/Desktop/documents --apply
-```
+# Apply renaming
+npm run apply -- --target-dir ~/docs --apply
 
-Note: `npm run apply` is dry-run by default. Add `--apply` for real renaming.
-
-### Choosing a Model
-
-```bash
-# OpenAI
+# Choose a model
 npm run apply -- --target-dir ~/docs --model gpt-4o-mini --apply
 
-# Google Gemini
-npm run apply -- --target-dir ~/docs --model gemini-2.5-pro --apply
+# Local model (offline)
+npm run apply -- --target-dir ~/docs --model llama3.3:latest --apply
 
-# Local Ollama model (offline)
-npm run apply -- --target-dir ~/docs --model gpt-oss:20b --apply
+# Rename only PDFs
+npm run apply:pdf -- --target-dir ~/docs --apply
+
+# Rename only photos
+npm run apply:photos -- --target-dir ~/docs --apply
+
+# Limit to 10 files (good for testing)
+npm run apply -- --target-dir ~/docs --limit 10 --apply
 ```
 
 ### Naming Language
 
-By default, names are generated in English. You can change this with `--lang`:
+Names are generated in English by default. Change with `--lang`:
 
 ```bash
-# English (default, no flag needed)
-npm run apply -- --target-dir ~/docs --apply
-
-# Polish
-npm run apply -- --target-dir ~/docs --lang pl --apply
-
-# Belarusian (transliteration)
-npm run apply -- --target-dir ~/docs --lang be --apply
-
-# Russian (transliteration)
-npm run apply -- --target-dir ~/docs --lang ru --apply
+npm run apply -- --target-dir ~/docs --lang pl --apply   # Polish
+npm run apply -- --target-dir ~/docs --lang be --apply   # Belarusian (transliteration)
+npm run apply -- --target-dir ~/docs --lang ru --apply   # Russian (transliteration)
 ```
 
-Or set it in `.env` so you do not have to pass it every time:
+Or set once in `.env`:
 
 ```env
 NAMING_LANG=en
 ```
 
-### Limiting the Number of Files
+### Sorting Files into Folders
 
 ```bash
-# Process only the first 10 files (good for testing)
-npm run apply -- --target-dir ~/docs --limit 10 --apply
+# Standard sorting (by file name)
+npm run organize -- --target-dir ~/docs --apply
+
+# Smart sorting (reads content, asks LLM for the category)
+npm run organize:smart -- --target-dir ~/docs --apply
 ```
 
-### Filtering by File Type
-
-Quick commands for specific types:
-
-```bash
-# PDF only
-npm run apply:pdf -- --target-dir ~/docs
-
-# Photos only (jpg, png, tiff, bmp, webp, gif)
-npm run apply:photos -- --target-dir ~/docs
-
-# Word/XML documents only (doc, docx, xml)
-npm run apply:docs -- --target-dir ~/docs
-```
-
-Or via the `--include` parameter with a preset or custom glob:
-
-```bash
-# Preset
-npm run apply -- --target-dir ~/docs --include pdf --apply
-npm run apply -- --target-dir ~/docs --include photos --apply
-
-# Multiple presets together
-npm run apply -- --target-dir ~/docs --include pdf,photos --apply
-
-# Custom glob
-npm run apply -- --target-dir ~/docs --include "**/*.{pdf,png}" --apply
-```
-
-Available presets:
-
-| Preset | Formats |
-|---|---|
-| `all` | pdf, jpg, jpeg, png, tiff, tif, bmp, webp, gif, doc, docx, xml (default) |
-| `pdf` | pdf |
-| `photos` | jpg, jpeg, png, tiff, tif, bmp, webp, gif |
-| `docs` | doc, docx, xml |
-
----
-
-## Running with Different Folders
-
-### The `--target-dir` Parameter
-
-Pass the path to any folder:
-
-```bash
-npm run apply -- --target-dir ~/Desktop/scans --apply
-npm run apply -- --target-dir ~/Documents/invoices --apply
-npm run apply -- --target-dir /Volumes/USB/documents --apply
-```
-
-Windows example:
-
-```powershell
-npm run apply -- --target-dir "C:\Users\<you>\Documents\scans" --apply
-```
-
-### Setting `TARGET_DIR` in `.env`
-
-Edit `.env`:
-
-```env
-TARGET_DIR=~/Documents/my-docs
-```
-
-Windows example:
-
-```env
-TARGET_DIR=C:\Users\<you>\Documents\my-docs
-```
-
-Then simply run:
-
-```bash
-npm run apply
-```
-
-### Shell Alias (for frequent use)
-
-This is a Unix shell convenience (`zsh`/`bash`). On Windows, create a PowerShell function/profile alias instead.
-
-Add to `~/.zshrc` or `~/.bashrc`:
-
-```bash
-alias rename-docs='npm --prefix /path/to/project/tools/rename-agent run apply --'
-```
-
-After that, from any directory:
-
-```bash
-rename-docs --target-dir ~/Desktop/scans
-rename-docs --target-dir ~/docs --dry-run --limit 5
-```
-
----
-
-## Sorting Files by Category
-
-After renaming, you can automatically sort files into category folders.
-Files are split into automatically detected category folders.
-
-### Standard Sorting (by file name)
-
-```bash
-# Preview sorting plan (no files moved)
-npm run organize -- --target-dir ~/Desktop/documents --dry-run
-
-# Execute sorting
-npm run organize -- --target-dir ~/Desktop/documents --apply
-```
-
-### Smart Sorting (with content analysis)
-
-The `--smart` mode reads the content of each file (text or OCR) and asks the LLM which category it belongs to. This allows:
-- Correctly classifying scans and document photos by their content
-- Distinguishing photos of people from photos of documents
-- Accurately determining the type even when the file name is uninformative (e.g. `IMG_001.jpg`)
-
-```bash
-# Preview (no files moved)
-npm run organize:smart -- --target-dir ~/Desktop/documents --dry-run
-
-# Execute sorting
-npm run organize:smart -- --target-dir ~/Desktop/documents --apply
-
-# With a specific model
-npm run organize:smart -- --target-dir ~/docs --apply --model gpt-4o-mini
-```
-
-### Additional organize Parameters
-
-```bash
-# Set a different output folder name
-npm run organize -- --target-dir ~/docs --apply --out-dir my_sorted_docs
-
-# Limit the number of files
-npm run organize -- --target-dir ~/docs --dry-run --limit 50
-```
-
-The result is a structure like:
+Result:
 
 ```
 sorted_documents/
 ├── invoices/
-│   ├── invoice_orange_2024-03.pdf
-│   └── invoice_electric_company_2024-05.pdf
 ├── taxes_and_social/
-│   ├── tax_return_2023.pdf
-│   └── social_insurance_2024-01.pdf
 ├── contracts/
-│   └── lease_agreement_apartment_2024-02.pdf
 └── other/
-    └── unreadable_scan.jpg
+```
+
+### Full Workflow Example
+
+```bash
+# 1. Preview what will be renamed
+npm run apply -- --dry-run --target-dir ~/Desktop/my-docs
+
+# 2. Rename
+npm run apply -- --target-dir ~/Desktop/my-docs --apply
+
+# 3. Sort into folders
+npm run organize -- --target-dir ~/Desktop/my-docs --apply
 ```
 
 ---
 
-## Reading Documents (OCR)
+## Command Reference
 
-The utility `tools/read_document.py` is used by the agent automatically, but you can also use it directly.
-
-### Running
-
-```bash
-# Read a PDF with text
-.venv/bin/python tools/read_document.py document.pdf
-
-# Recognize a scan (OCR)
-.venv/bin/python tools/read_document.py scan.jpg
-
-# Force OCR for a PDF
-.venv/bin/python tools/read_document.py document.pdf --mode ocr
-
-# Set OCR languages
-.venv/bin/python tools/read_document.py scan.png --lang pol+eng
-
-# Select specific pages
-.venv/bin/python tools/read_document.py big.pdf --pages 1-3,5
-
-# Save result to a file
-.venv/bin/python tools/read_document.py scan.pdf --output result.txt
-```
-
-Alternatively, use the wrapper `tools/read_doc.sh`, which finds the venv automatically:
-
-```bash
-./tools/read_doc.sh document.pdf
-./tools/read_doc.sh scan.jpg --mode ocr --lang pol+eng
-```
-
-### Operating Modes
-
-| Mode | Description |
-|---|---|
-| `auto` | Automatic: if the PDF contains text, extracts it; otherwise uses OCR. For images, always uses OCR |
-| `text` | Text extraction from PDF only (no OCR) |
-| `ocr` | Forced recognition via Tesseract |
-
-### Supported Formats
-
-PDF, JPG/JPEG, PNG, TIFF/TIF, BMP, WebP, GIF, DOC, DOCX, XML
-
----
-
-## All Command-Line Parameters
-
-### `npm run apply` (renaming)
+### `npm run apply` — renaming
 
 | Parameter | Description | Default |
 |---|---|---|
-| `--target-dir <path>` | Folder with files to process | from `.env` |
-| `--dry-run` | Preview only, no renaming | |
+| `--target-dir <path>` | Folder with files to process | `TARGET_DIR` from `.env` |
+| `--dry-run` | Preview only, no changes | *(default)* |
 | `--apply` | Execute renaming | |
-| `--model <name>` | LLM model from supported whitelist | `LLM_MODEL` or provider-aware auto selection (`gpt-oss:20b` fallback) |
-| `--ollama-base-url <url>` | Ollama server URL | `http://localhost:11434` |
-| `--include <preset\|glob>` | File type filter: `pdf`, `photos`, `docs`, `all`, or glob | `all` |
+| `--model <name>` | LLM model | auto-detected from `.env` keys |
+| `--include <preset\|glob>` | Filter: `pdf`, `photos`, `docs`, `all`, or a glob | `all` |
 | `--lang <code>` | Naming language: `en`, `pl`, `be`, `ru` | `en` |
-| `--limit <N>` | Process only the first N files | `0` (all) |
-| `--ignore-list <path>` | Path to rename ignore list | `<project-root>/.rename-agent-ignore-rename.txt` |
-| `--no-update-ignore-list` | Do not update the ignore list | update |
+| `--limit <N>` | Process only first N files | all |
+| `--ignore-list <path>` | Custom ignore list path | `.rename-agent-ignore-rename.txt` |
+| `--no-update-ignore-list` | Don't update the ignore list | |
+| `--ollama-base-url <url>` | Ollama server URL | `http://localhost:11434` |
 
-### `npm run organize` (sorting)
+Shortcut commands: `npm run apply:pdf`, `npm run apply:photos`, `npm run apply:docs`.
 
-| Parameter | Description | Default |
-|---|---|---|
-| `--target-dir <path>` | Folder with files | from `.env` |
-| `--dry-run` | Preview only | |
-| `--apply` | Execute file moves | |
-| `--out-dir <name>` | Output folder name for sorting | `sorted_documents` |
-| `--smart` | Smart sorting: content analysis via LLM | disabled |
-| `--model <name>` | LLM model (for `--smart`) | same defaults as `apply` |
-| `--limit <N>` | Limit the number of files | `0` (all) |
-| `--ignore-list <path>` | Path to organize ignore list | `<project-root>/.rename-agent-ignore-organize.txt` |
-| `--no-update-ignore-list` | Do not update organize ignore list | update |
-
-### `.venv/bin/python tools/read_document.py` (reading)
+### `npm run organize` — sorting
 
 | Parameter | Description | Default |
 |---|---|---|
-| `file` | Path to the file | (required) |
-| `--mode` | `text`, `ocr`, `auto` | `auto` |
-| `--lang` | OCR languages | `pol+eng+rus` |
-| `--pages` | Page range (e.g. `1-3,5`) | all |
-| `--dpi` | DPI for rendering | `300` |
+| `--target-dir <path>` | Folder with files | `TARGET_DIR` from `.env` |
+| `--dry-run` | Preview only | *(default)* |
+| `--apply` | Execute sorting | |
+| `--smart` | Analyze content via LLM | off |
+| `--model <name>` | LLM model (for `--smart`) | same as `apply` |
+| `--out-dir <name>` | Output folder name | `sorted_documents` |
+| `--limit <N>` | Process only first N files | all |
+| `--ignore-list <path>` | Custom ignore list path | `.rename-agent-ignore-organize.txt` |
+| `--no-update-ignore-list` | Don't update the ignore list | |
+
+Shortcut: `npm run organize:smart` = `npm run organize -- --smart`.
+
+### `read_document.py` — reading / OCR
+
+```bash
+.venv/bin/python tools/read_document.py <file> [options]
+```
+
+| Parameter | Description | Default |
+|---|---|---|
+| `file` | Path to file (PDF, JPG, PNG, ...) | *(required)* |
+| `--mode` | `auto`, `text`, `ocr` | `auto` |
+| `--lang` | OCR languages (EasyOCR codes, comma-separated) | `en,ru,be,uk` |
+| `--pages` | Page range, e.g. `1-3,5` | all |
+| `--dpi` | Render DPI | `300` |
 | `--output` / `-o` | Save to file | stdout |
+| `--smart-pages` | Auto-select pages for long PDFs | off |
+
+Shell wrapper (finds venv automatically): `./tools/read_doc.sh <file> [options]`
+
+---
+
+## Configuration (.env)
+
+The `.env` file in the project root controls all settings. Created automatically by `setup.sh` or manually from `.env.example`.
+
+Key settings:
+
+```env
+# Model (optional — auto-detected from available keys)
+LLM_MODEL=gpt-4o-mini
+
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# Ollama (local, free)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=gpt-oss:20b
+
+# Google Gemini
+GOOGLE_GEMINI_API_KEY=...
+
+# Target folder (or pass --target-dir each time)
+TARGET_DIR=
+
+# Naming language: en | pl | be | ru
+NAMING_LANG=en
+
+# Python path (setup.sh sets this automatically)
+READER_PYTHON=.venv/bin/python
+
+# OCR languages (EasyOCR codes, comma-separated)
+OCR_LANG=en,ru,be,uk
+
+# Vision model for organize:smart (optional)
+VISION_MODEL=gpt-4o
+```
+
+Model priority: `LLM_MODEL` > `OPENAI_MODEL` (if key set) > `OLLAMA_MODEL` > `GOOGLE_MODEL` (if key set) > `gpt-oss:20b` fallback.
+
+---
+
+## Ignore Lists
+
+The agent tracks processed files so you can stop and resume at any time.
+
+Two separate lists (in the project root):
+- `.rename-agent-ignore-rename.txt` — for renaming (`apply`)
+- `.rename-agent-ignore-organize.txt` — for sorting (`organize`)
+
+What this means:
+- **Resume safely** — re-run the command and only new files will be processed
+- **Reprocess everything** — delete the ignore file and run again
+- **One-time run** — add `--no-update-ignore-list`
+
+```bash
+# Resume from where you left off
+npm run apply -- --target-dir ~/docs --apply
+
+# Force reprocessing
+rm .rename-agent-ignore-rename.txt
+npm run apply -- --target-dir ~/docs --apply
+```
+
+---
+
+## Output Files
+
+After running, the agent creates files in `tools/rename-agent/outputs/`:
+
+| File | Description |
+|---|---|
+| `rename-plan.json` | Full renaming plan with metadata |
+| `rename-plan.csv` | CSV version (for Excel / Google Sheets) |
+| `pending-files.txt` | Files awaiting processing |
+| `organize-plan.json` | Sorting plan |
+| `organize-plan.csv` | CSV version of the sorting plan |
+
+Additionally, a `DOCUMENT_CATALOG.md` is created in the target folder — an auto-updated catalog of all files.
 
 ---
 
 ## Naming Rules
 
-The agent generates names according to rules from the file `tools/rename-agent/rules.prompt.txt`:
+Names follow the rules in `tools/rename-agent/rules.prompt.txt`:
 
-- Language: **English**, Latin alphabet
-- Format: `<category>_<subject>_<date>` in **snake_case**
-- Example categories: `invoice`, `tax_return`, `bank_statement`, `contract`, `certificate`, `residence_permit`, `passport`, `application`, `scan`, `report`
-- Date (if known): `YYYY-MM` or `YYYY-MM-DD`
-- If the document contains a person (passport, permit) -- the surname is added to the name
-- Unreadable scans: `unreadable_scan`
-- The file extension is not changed
+- **Format:** `category_subject_date` in snake_case
+- **Language:** English, Latin alphabet (by default)
+- **Date:** `YYYY-MM` or `YYYY-MM-DD` (if found in the document)
+- **People:** surname is added for passports, permits, certificates
+- **Unreadable:** `unreadable_scan`
+- **Extension:** never changed
 
-### Renaming Examples
+Example categories: `invoice`, `tax_return`, `bank_statement`, `contract`, `certificate`, `residence_permit`, `passport`, `application`, `scan`, `report`.
 
 | Before | After |
 |---|---|
@@ -618,186 +330,126 @@ The agent generates names according to rules from the file `tools/rename-agent/r
 
 ---
 
-## Output Files
+## Supported File Formats
 
-After running, the agent creates files in `tools/rename-agent/outputs/`:
+PDF, JPG/JPEG, PNG, TIFF/TIF, BMP, WebP, GIF, DOC, DOCX, XML
 
-| File | Description |
+Filter presets for `--include`:
+
+| Preset | Formats |
 |---|---|
-| `rename-plan.json` | Full renaming plan with metadata |
-| `rename-plan.csv` | CSV version of the plan (for Excel / Google Sheets) |
-| `pending-files.txt` | List of files awaiting processing |
-| `organize-plan.json` | Sorting plan by folders |
-| `organize-plan.csv` | CSV version of the sorting plan |
+| `all` | all of the above *(default)* |
+| `pdf` | PDF only |
+| `photos` | JPG, JPEG, PNG, TIFF, TIF, BMP, WebP, GIF |
+| `docs` | DOC, DOCX, XML |
 
-Additionally:
-
-- In target folder: **`DOCUMENT_CATALOG.md`** -- automatically updated catalog of all files
-- In project root: **`.rename-agent-ignore-rename.txt`** -- list of already renamed files
-- In project root: **`.rename-agent-ignore-organize.txt`** -- list of already organized files
+You can also pass a custom glob: `--include "**/*.{pdf,png}"`.
 
 ---
 
-## Ignore List and Resuming Work
+## System Requirements
 
-The agent uses two ignore lists in project root:
+| Dependency | Purpose | macOS | Linux (Ubuntu/Debian) | Windows |
+|---|---|---|---|---|
+| **Node.js >=18** | Agent runtime | `brew install node` | `sudo apt install -y nodejs npm` | [nodejs.org](https://nodejs.org) LTS installer |
+| **Python 3.10+** | OCR and PDF reading | `brew install python` | `sudo apt install -y python3 python3-venv python3-pip` | [python.org](https://python.org) (check "Add to PATH") |
 
-- `.rename-agent-ignore-rename.txt` for rename flow (`apply`)
-- `.rename-agent-ignore-organize.txt` for organize flow (`organize`, `organize:smart`)
+OCR is handled by **EasyOCR** (installed via pip, no system-level OCR packages needed).
 
-This means:
+### Manual Installation (step by step)
 
-1. **You can safely stop and resume** -- on the next run, the agent will skip already processed files
-2. **New files are picked up automatically** -- just run the agent again
-3. **To reprocess everything** -- delete one or both ignore files from project root
+If you prefer not to use `setup.sh`:
 
 ```bash
-# Resume from where you left off
-npm run apply -- --target-dir ~/docs --apply
+# 1. Clone
+git clone <repository-url>
+cd file_rename
 
-# Force reprocessing of all files
-rm ./.rename-agent-ignore-rename.txt
-rm ./.rename-agent-ignore-organize.txt
-npm run apply -- --target-dir ~/docs --apply
+# 2. Python venv
+python3 -m venv .venv
+.venv/bin/pip install pdfplumber Pillow PyMuPDF easyocr
 
-# Do not update the ignore list (one-time run)
-npm run apply -- --target-dir ~/docs --no-update-ignore-list --apply
+# 3. Node.js dependencies
+npm --prefix tools/rename-agent install
+
+# 4. Configuration
+cp .env.example .env
+# Edit .env — add API key, set READER_PYTHON to absolute path
+
+# 5. Verify
+.venv/bin/python tools/read_document.py --help
+npm run apply -- --dry-run --limit 1 --target-dir ~/Desktop
 ```
+
+On Windows, replace `.venv/bin/python` with `.\.venv\Scripts\python.exe` and `cp` with `Copy-Item`.
 
 ---
 
-## Usage Examples
+## Tips
 
-### Example 1: First Run -- Preview
-
-Always start by looking at what the agent suggests:
+**Working with different folders:**
 
 ```bash
-npm run apply -- --dry-run --target-dir ~/Desktop/documents
+# Pass the path directly
+npm run apply -- --target-dir /Volumes/USB/scans --apply
+
+# Or set it in .env so you don't have to type it every time
+# TARGET_DIR=~/Documents/my-docs
 ```
 
-The output will show the suggested name, type, date, and confidence level for each file. No actual files will be changed.
-
-### Example 2: Rename All Documents
+**Shell alias** (macOS/Linux) for frequent use:
 
 ```bash
-npm run apply -- --target-dir ~/Desktop/documents --apply
+# Add to ~/.zshrc or ~/.bashrc:
+alias rename-docs='npm --prefix /path/to/file_rename run apply --'
+
+# Then from anywhere:
+rename-docs --target-dir ~/Desktop/scans --apply
 ```
 
-### Example 3: Test on a Small Sample
-
-```bash
-npm run apply -- --target-dir ~/Desktop/documents --limit 5 --dry-run
-```
-
-### Example 4: Using a Local Model (offline)
-
-```bash
-# First, start Ollama:
-ollama serve
-
-# Then:
-npm run apply -- --target-dir ~/docs --model llama3.3:latest --apply
-```
-
-### Example 5: Full Cycle -- Rename + Sort
-
-```bash
-# Step 1: Rename
-npm run apply -- --target-dir ~/Desktop/my-docs --apply
-
-# Step 2: Preview the sorting plan
-npm run organize -- --target-dir ~/Desktop/my-docs --dry-run
-
-# Step 3: Sort
-npm run organize -- --target-dir ~/Desktop/my-docs --apply
-```
-
-### Example 6: Processing an External Drive
-
-```bash
-npm run apply -- --target-dir /Volumes/MyUSB/scans --model gpt-4o-mini --apply
-```
-
-### Example 7: Read a Single Document Manually
-
-```bash
-.venv/bin/python tools/read_document.py ~/Desktop/scan.pdf
-
-# Or via the wrapper (it finds the venv automatically):
-./tools/read_doc.sh ~/Desktop/scan.pdf
-```
-
-### Example 8: Repeated Processing of New Files
-
-```bash
-# First run -- processes all files
-npm run apply -- --target-dir ~/docs --apply
-
-# Later, new files are added to ~/docs -- run again
-# The agent will process only the new ones (thanks to the ignore list)
-npm run apply -- --target-dir ~/docs --apply
-```
+**Processing new files** — just run the same command again. The ignore list ensures only new files are processed.
 
 ---
 
-## Questions and Troubleshooting
+## Troubleshooting
 
-### "unreadable_scan" appears for many files
+### "unreadable_scan" for many files
 
-OCR could not recognize the text. Possible causes:
-- Tesseract is not installed or is missing the required language packs
-- Low quality scans
-- The document is in a language not included in `OCR_LANG`
+OCR could not recognize the text. Check:
+- Python venv has EasyOCR installed: `.venv/bin/python -c "import easyocr; print('OK')"`
+- `OCR_LANG` in `.env` includes the right languages (e.g. `en,ru,be,uk`)
+- Scan quality is sufficient
 
-Solution: run `brew install tesseract-lang` and check `OCR_LANG` in `.env`.
-Also install language packs for your OS:
-- macOS: `brew install tesseract-lang`
-- Linux (Ubuntu/Debian): `sudo apt install -y tesseract-ocr-eng tesseract-ocr-pol tesseract-ocr-rus`
-- Windows: add `eng`, `pol`, `rus` data files to your Tesseract installation folder
+### Agent does not see files
 
-### The agent does not see the files
-
-Check that:
 - `--target-dir` points to the correct folder
-- Files have a supported extension (pdf, jpg, png, tiff, doc, docx, xml)
-- Files are not listed in root ignore files (`.rename-agent-ignore-rename.txt` / `.rename-agent-ignore-organize.txt`)
+- Files have a supported extension
+- Files are not in the ignore list (`.rename-agent-ignore-rename.txt`)
 
-### LLM/model error
+### LLM / model error
 
-- **OpenAI**: check `OPENAI_API_KEY` in `.env`
-- **Ollama**: make sure `ollama serve` is running
-- **Google**: check `GOOGLE_GEMINI_API_KEY`
-- **Unsupported model**: use only models from `tools/rename-agent/src/llm.mjs` (`Model` list)
+- **OpenAI:** check `OPENAI_API_KEY` in `.env`
+- **Ollama:** make sure `ollama serve` is running
+- **Google:** check `GOOGLE_GEMINI_API_KEY`
+- **Unsupported model:** use only models from the [supported list](#supported-models)
 
 ### Python not found
 
-The agent looks for Python in the following order:
+The agent looks for Python in this order:
+1. `READER_PYTHON` from `.env` (set by `setup.sh`)
+2. `.venv/bin/python` in the project root
+3. System `python3` (fallback)
 
-1. `READER_PYTHON` from `.env` (`setup.sh` sets this automatically)
-2. `.venv/bin/python` in the project root (found automatically)
-3. System `python3` (fallback, may not have the required libraries)
-
-To verify that the venv works:
-
-```bash
-.venv/bin/python -c "import pdfplumber, pytesseract, fitz; print('OK')"
-```
-
-Windows equivalent:
-
-```powershell
-.\.venv\Scripts\python.exe -c "import pdfplumber, pytesseract, fitz; print('OK')"
-```
-
-If something is not installed, add it:
+Verify the venv works:
 
 ```bash
-.venv/bin/pip install pdfplumber pytesseract Pillow pdf2image PyMuPDF
+.venv/bin/python -c "import pdfplumber, easyocr, fitz; print('OK')"
 ```
 
-Windows equivalent:
+If something is missing:
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install pdfplumber pytesseract Pillow pdf2image PyMuPDF
+```bash
+.venv/bin/pip install pdfplumber Pillow PyMuPDF easyocr
 ```
+
+Windows equivalents: use `.\.venv\Scripts\python.exe` instead of `.venv/bin/python`.
