@@ -260,24 +260,50 @@ function detectCategory(relativePath) {
   return "other";
 }
 
-function buildClassifySystemPrompt() {
-  return [
-    "You are a document classifier. Choose exactly ONE category from the list.",
-    `Categories: ${CATEGORIES.join(", ")}`,
+function buildClassifySystemPrompt(existingFolders = []) {
+  const lines = [
+    "You are a document classifier. Based on the file content, choose the best folder name for this file.",
     "",
-    "Rules:",
-    "- photos_of_people: photos of people (selfies, portraits, group photos) that are NOT document scans",
-    "- scans_and_photos: scanned documents, photos of documents, unreadable scans",
-    "- identity_documents: passports, IDs, visas, PESEL",
-    "- invoices: invoices, bills",
-    "- contracts: contracts, agreements",
-    "- bank_statements: bank statements, payment history",
-    "- taxes_and_social: PIT, VAT, ZUS, tax declarations",
-    "- applications_and_decisions: applications, decisions, permits, residence permits",
-    "- other: if nothing else fits",
+  ];
+
+  if (existingFolders.length > 0) {
+    lines.push(
+      `Existing folders: ${existingFolders.join(", ")}`,
+      "Prefer one of these folders if the file fits. You may propose a new folder name if none of them are appropriate.",
+      "",
+    );
+  } else {
+    lines.push(
+      "No folders exist yet. Propose a short, descriptive folder name.",
+      "",
+    );
+  }
+
+  lines.push(
+    "Folder naming rules:",
+    "- snake_case, English, Latin alphabet only",
+    "- 1 to 4 words, short and descriptive",
+    "- Examples: invoices, tax_declarations, polish_documents, photos_people, utility_bills, bank_statements, identity_documents, contracts, medical_records",
     "",
-    "Reply with ONLY the category name, nothing else.",
-  ].join("\n");
+    "Guidelines:",
+    "- Photos of people (selfies, portraits, group photos) that are NOT document scans → photos_people or similar",
+    "- Scanned documents or photos of documents → appropriate content-based folder, NOT a generic scans folder",
+    "- If the document language is notable (e.g. all in Polish), you may reflect that in the folder name",
+    "- If content is completely unreadable → unreadable_scans",
+    "",
+    'Reply with JSON: { "folder": "folder_name", "reason": "brief explanation" }',
+  );
+
+  return lines.join("\n");
+}
+
+async function getExistingFolders(outRootAbs) {
+  try {
+    const entries = await fs.readdir(outRootAbs, { withFileTypes: true });
+    return entries.filter((e) => e.isDirectory()).map((e) => e.name);
+  } catch {
+    return [];
+  }
 }
 
 const MIME_MAP = {
@@ -291,15 +317,68 @@ const MIME_MAP = {
   ".bmp": "image/bmp",
 };
 
-async function detectCategorySmart({ llm, visionLlm, absPath, relativePath }) {
+function sanitizeFolderName(raw) {
+  return (
+    raw
+      .toLowerCase()
+      .trim()
+      .replace(/[\s-]+/g, "_")
+      .replace(/[^a-z0-9_]/g, "")
+      .replace(/_{2,}/g, "_")
+      .replace(/^_|_$/g, "") || "other"
+  );
+}
+
+function parseSmartResponse(resBody) {
+  let rawResponse;
+  if (typeof resBody === "string") {
+    rawResponse = resBody;
+  } else if (Array.isArray(resBody)) {
+    rawResponse = resBody
+      .map((p) => (typeof p === "string" ? p : p?.text || ""))
+      .join(" ");
+  } else {
+    rawResponse = String(resBody ?? "");
+  }
+  rawResponse = rawResponse.trim();
+
+  // Try to parse JSON response
+  const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.folder) {
+        return {
+          folder: sanitizeFolderName(parsed.folder),
+          reason: parsed.reason || "",
+        };
+      }
+    } catch {
+      // JSON parse failed, fall through to plain text extraction
+    }
+  }
+
+  // Fallback: treat whole response as a folder name
+  const folder = sanitizeFolderName(
+    rawResponse.replace(/[^a-zA-Z0-9_ -]/g, ""),
+  );
+  return { folder, reason: "" };
+}
+
+async function detectCategorySmart({
+  llm,
+  visionLlm,
+  absPath,
+  relativePath,
+  existingFolders,
+}) {
   const ext = path.extname(absPath).toLowerCase();
   const isImage = IMAGE_EXTS.has(ext);
-  const systemPrompt = buildClassifySystemPrompt();
+  const systemPrompt = buildClassifySystemPrompt(existingFolders);
 
   let res;
 
   if (isImage && visionLlm) {
-    // Для выяў — адпраўляем саму выяву ў vision-мадэль
     const imageData = await fs.readFile(absPath);
     const base64 = imageData.toString("base64");
     const mimeType = MIME_MAP[ext] || "image/jpeg";
@@ -315,7 +394,6 @@ async function detectCategorySmart({ llm, visionLlm, absPath, relativePath }) {
     });
     res = await visionLlm.invoke([message]);
   } else {
-    // Для дакументаў — тэкставы аналіз
     const content = await extractContent(absPath);
     const prompt = [
       systemPrompt,
@@ -328,27 +406,12 @@ async function detectCategorySmart({ llm, visionLlm, absPath, relativePath }) {
     ].join("\n");
     res = await llm.invoke(prompt);
   }
-  // res.content можа быць радком або масівам аб'ектаў з .text (OpenAI reasoning models)
-  const resBody = res?.content;
-  let rawResponse;
-  if (typeof resBody === "string") {
-    rawResponse = resBody;
-  } else if (Array.isArray(resBody)) {
-    rawResponse = resBody
-      .map((p) => (typeof p === "string" ? p : p?.text || ""))
-      .join(" ");
-  } else {
-    rawResponse = String(resBody ?? "");
-  }
-  rawResponse = rawResponse.trim().toLowerCase();
 
-  // Шукаем назву катэгорыі ў адказе LLM
-  for (const cat of CATEGORIES) {
-    if (rawResponse.includes(cat)) return cat;
+  const { folder, reason } = parseSmartResponse(res?.content);
+  if (reason) {
+    console.log(`  → reason: ${reason}`);
   }
-  // Фолбэк: прыбіраем усё акрамя літар і _
-  const cleaned = rawResponse.replace(/[^a-z_]/g, "");
-  return CATEGORIES.includes(cleaned) ? cleaned : "other";
+  return folder;
 }
 
 async function exists(filePath) {
@@ -468,6 +531,12 @@ async function main() {
   const operations = [];
   const reservedDestinations = new Set();
 
+  // Scan existing folders so the LLM can reuse them for consistency
+  const existingFolders = new Set(await getExistingFolders(outRootAbs));
+  if (args.smart && existingFolders.size > 0) {
+    console.log(`Existing folders: ${[...existingFolders].join(", ")}`);
+  }
+
   const totalSelected = selected.length;
   for (const [index, item] of selected.entries()) {
     const processed = index + 1;
@@ -482,7 +551,9 @@ async function main() {
           visionLlm,
           absPath: item.absPath,
           relativePath: item.relPath,
+          existingFolders: [...existingFolders],
         });
+        existingFolders.add(category);
         console.log(`${progress} Classified: ${item.relPath} -> ${category}`);
       } catch (err) {
         const errMsg = String(err?.message || err || "");
@@ -501,7 +572,9 @@ async function main() {
               visionLlm: null,
               absPath: item.absPath,
               relativePath: item.relPath,
+              existingFolders: [...existingFolders],
             });
+            existingFolders.add(category);
             console.log(
               `${progress} Classified via OCR/text fallback: ${item.relPath} -> ${category}`,
             );
