@@ -9,23 +9,45 @@
     --mode text       Выцягнуць тэкст з PDF (па змаўчанні для PDF)
     --mode ocr        Распазнаць тэкст праз OCR (па змаўчанні для выяў)
     --mode auto       Аўтаматычна выбраць рэжым (па змаўчанні)
-    --lang pol+eng    Мовы OCR (па змаўчанні: pol+eng+rus+bel+ukr)
+    --lang en,ru      Мовы OCR (па змаўчанні: en,ru,be,uk,pl)
     --pages 1-3       Дыяпазон старонак (толькі для PDF)
     --dpi 300         DPI для рэндэрынгу PDF у выяву (па змаўчанні: 300)
     --output file.txt Захаваць вынік у файл
 
 Прыклады:
     python tools/read_document.py document.pdf
-    python tools/read_document.py scan.pdf --mode ocr --lang pol
+    python tools/read_document.py scan.pdf --mode ocr --lang ru,en
     python tools/read_document.py photo.jpg
-    python tools/read_document.py invoice.png --lang pol+eng
+    python tools/read_document.py invoice.png --lang pl,en
     python tools/read_document.py doc.pdf --pages 1-5
+
+OCR engine: EasyOCR (pure pip, no system dependencies).
 """
 
 import argparse
 import os
 import sys
 from pathlib import Path
+
+# EasyOCR language codes (different from Tesseract)
+# EasyOCR: Cyrillic langs are only compatible with English.
+# Polish uses Latin script — covered by "en" recognition.
+DEFAULT_OCR_LANGS = ["en", "ru", "be", "uk"]
+
+# Lazy-loaded EasyOCR reader (heavy init — reuse across calls)
+_ocr_reader = None
+
+
+def _get_ocr_reader(langs: list[str] | None = None):
+    """Get or create a cached EasyOCR reader instance."""
+    global _ocr_reader
+    if langs is None:
+        langs = DEFAULT_OCR_LANGS
+    if _ocr_reader is None:
+        import easyocr
+
+        _ocr_reader = easyocr.Reader(langs, gpu=False, verbose=False)
+    return _ocr_reader
 
 
 def extract_text_pdfplumber(pdf_path: str, pages: list[int] | None = None) -> str:
@@ -71,54 +93,54 @@ def extract_text_pymupdf(pdf_path: str, pages: list[int] | None = None) -> str:
     return "\n\n".join(texts)
 
 
-def ocr_image(image_path: str, lang: str = "pol+eng+rus+bel+ukr") -> str:
-    """Распазнаць тэкст з выявы праз Tesseract OCR."""
-    import pytesseract
-    from PIL import Image
+def ocr_image(image_path: str, langs: list[str] | None = None) -> str:
+    """Распазнаць тэкст з выявы праз EasyOCR."""
+    reader = _get_ocr_reader(langs)
+    result = reader.readtext(image_path)
+    lines = [text for (_, text, _) in result]
+    return "\n".join(lines).strip()
 
-    img = Image.open(image_path)
-    text = pytesseract.image_to_string(img, lang=lang)
-    return text.strip()
+
+def _render_pdf_page_to_png(doc, page_index: int, dpi: int = 300) -> bytes:
+    """Render a single PDF page to PNG bytes using PyMuPDF."""
+    page = doc[page_index]
+    pix = page.get_pixmap(dpi=dpi)
+    return pix.tobytes("png")
 
 
 def ocr_pdf(
     pdf_path: str,
-    lang: str = "pol+eng+rus+bel+ukr",
+    langs: list[str] | None = None,
     dpi: int = 300,
     pages: list[int] | None = None,
 ) -> str:
-    """Распазнаць тэкст у адсканаваным PDF праз OCR."""
-    import pytesseract
-    from pdf2image import convert_from_path
+    """Распазнаць тэкст у адсканаваным PDF праз EasyOCR + PyMuPDF rendering."""
+    import fitz
 
-    kwargs = {"dpi": dpi}
-    if pages is not None:
-        # pdf2image выкарыстоўвае 1-based нумарацыю
-        kwargs["first_page"] = min(pages) + 1
-        kwargs["last_page"] = max(pages) + 1
-
-    images = convert_from_path(pdf_path, **kwargs)
+    reader = _get_ocr_reader(langs)
+    doc = fitz.open(pdf_path)
+    total = len(doc)
+    target_pages = pages if pages else list(range(total))
 
     texts = []
-    total = len(images)
-    for i, img in enumerate(images):
-        page_num = (pages[i] + 1) if pages and i < len(pages) else (i + 1)
-        text = pytesseract.image_to_string(img, lang=lang)
-        if text.strip():
-            texts.append(f"--- Старонка {page_num}/{total} ---\n{text.strip()}")
+    for i in target_pages:
+        if i >= total:
+            continue
+        page_num = i + 1
+        img_bytes = _render_pdf_page_to_png(doc, i, dpi=dpi)
+        result = reader.readtext(img_bytes)
+        page_text = "\n".join(text for (_, text, _) in result).strip()
+        if page_text:
+            texts.append(f"--- Старонка {page_num}/{total} ---\n{page_text}")
         else:
             texts.append(f"--- Старонка {page_num}/{total} --- (тэкст не распазнаны)")
 
+    doc.close()
     return "\n\n".join(texts)
 
 
 def has_meaningful_text(pdf_path: str, sample_pages: int = 3) -> bool:
-    """Праверыць, ці ёсць у PDF рэальны тэкст (не сканы).
-
-    Сканы форм могуць утрымліваць асобныя лічбы/літары з палёў,
-    таму правяраем не толькі колькасць сімвалаў, але і наяўнасць
-    рэальных слоў (даўжэй за 3 сімвалы).
-    """
+    """Праверыць, ці ёсць у PDF рэальны тэкст (не сканы)."""
     try:
         import re
 
@@ -135,12 +157,10 @@ def has_meaningful_text(pdf_path: str, sample_pages: int = 3) -> bool:
             total_words += len(words)
             lines = [ln for ln in text.split("\n") if ln.strip()]
             total_lines += len(lines)
-            # Радкі з 1-2 сімвалаў — тыповы прызнак скана з OCR-лэерам
             total_short_lines += sum(1 for ln in lines if len(ln.strip()) <= 2)
         doc.close()
 
         words_per_page = total_words / max(total, 1)
-        # Калі больш за 40% радкоў — аднасімвальныя, гэта скан з OCR-лэерам
         if total_lines > 0 and total_short_lines / total_lines > 0.4:
             return False
         return words_per_page >= 3
@@ -177,6 +197,21 @@ def parse_pages(pages_str: str) -> list[int]:
     return sorted(set(pages))
 
 
+def _parse_langs(lang_str: str) -> list[str]:
+    """Parse language string into list. Supports both comma and + separators."""
+    # Support both "en,ru,be" and legacy "pol+eng+rus" formats
+    LEGACY_MAP = {
+        "pol": "pl",
+        "eng": "en",
+        "rus": "ru",
+        "bel": "be",
+        "ukr": "uk",
+    }
+    sep = "+" if "+" in lang_str else ","
+    langs = [l.strip() for l in lang_str.split(sep) if l.strip()]
+    return [LEGACY_MAP.get(l, l) for l in langs]
+
+
 def _get_pdf_page_count(pdf_path: str) -> int:
     """Get total page count of a PDF."""
     try:
@@ -197,9 +232,9 @@ def _smart_page_selection(total_pages: int, max_pages: int = 5) -> list[int] | N
     For longer PDFs — read first 3 + middle + last page.
     """
     if total_pages <= max_pages:
-        return None  # read all
+        return None
 
-    pages = [0, 1, 2]  # first 3 pages
+    pages = [0, 1, 2]
     mid = total_pages // 2
     if mid not in pages:
         pages.append(mid)
@@ -212,17 +247,12 @@ def _smart_page_selection(total_pages: int, max_pages: int = 5) -> list[int] | N
 def process_file(
     file_path: str,
     mode: str = "auto",
-    lang: str = "pol+eng+rus+bel+ukr",
+    langs: list[str] | None = None,
     pages: list[int] | None = None,
     dpi: int = 300,
     smart_pages: bool = False,
 ) -> str:
-    """Апрацаваць файл і вярнуць тэкст.
-
-    Args:
-        smart_pages: If True and pages is None, automatically select
-                     a subset of pages for long PDFs instead of reading all.
-    """
+    """Апрацаваць файл і вярнуць тэкст."""
     file_path = os.path.abspath(file_path)
 
     if not os.path.exists(file_path):
@@ -249,14 +279,13 @@ def process_file(
 
     # Апрацоўка
     if ext in image_exts:
-        return ocr_image(file_path, lang=lang)
+        return ocr_image(file_path, langs=langs)
     elif ext == ".pdf":
         if mode == "ocr":
             try:
-                return ocr_pdf(file_path, lang=lang, dpi=dpi, pages=pages)
+                return ocr_pdf(file_path, langs=langs, dpi=dpi, pages=pages)
             except Exception as e:
                 print(f"[OCR failed: {e}]", file=sys.stderr)
-                # OCR failed (encrypted PDF, corrupted, etc.) — try text extraction as fallback
                 try:
                     text = extract_text_pymupdf(file_path, pages=pages)
                     if text and "тэкст не знойдзены" not in text:
@@ -281,11 +310,10 @@ def process_file(
             # Text extraction returned nothing useful — fall back to OCR
             print("[Text extraction empty, falling back to OCR]", file=sys.stderr)
             try:
-                return ocr_pdf(file_path, lang=lang, dpi=dpi, pages=pages)
+                return ocr_pdf(file_path, langs=langs, dpi=dpi, pages=pages)
             except Exception as e:
                 return f"[UNREADABLE: all extraction methods failed for {Path(file_path).name}]"
     else:
-        # Паспрабаваць прачытаць як тэкст
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 return f.read()
@@ -295,7 +323,7 @@ def process_file(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Чытанне PDF і выяў з OCR",
+        description="Чытанне PDF і выяў з OCR (EasyOCR)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -308,8 +336,8 @@ def main():
     )
     parser.add_argument(
         "--lang",
-        default="pol+eng+rus+bel+ukr",
-        help="Мовы OCR (па змаўчанні: pol+eng+rus+bel+ukr)",
+        default="en,ru,be,uk",
+        help="Мовы OCR (па змаўчанні: en,ru,be,uk). Коды EasyOCR або legacy Tesseract.",
     )
     parser.add_argument(
         "--pages", default=None, help="Дыяпазон старонак, напр. 1-3,5,7-9"
@@ -325,17 +353,18 @@ def main():
         "--smart-pages",
         action="store_true",
         default=False,
-        help="Аўтаматычна выбіраць старонкі для доўгіх PDF (першыя 3 + сярэдзіна + апошняя)",
+        help="Аўтаматычна выбіраць старонкі для доўгіх PDF",
     )
 
     args = parser.parse_args()
 
     pages = parse_pages(args.pages) if args.pages else None
+    langs = _parse_langs(args.lang)
 
     result = process_file(
         file_path=args.file,
         mode=args.mode,
-        lang=args.lang,
+        langs=langs,
         pages=pages,
         dpi=args.dpi,
         smart_pages=args.smart_pages,

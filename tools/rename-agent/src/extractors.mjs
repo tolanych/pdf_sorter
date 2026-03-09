@@ -64,7 +64,7 @@ async function readPdfOrImageSafe(filePath) {
   const venvPython = path.join(workspaceRoot, ".venv", "bin", "python");
   const configuredPython = process.env.READER_PYTHON;
   const readerScript = process.env.READER_SCRIPT_PATH || DEFAULT_READER_SCRIPT;
-  const ocrLang = process.env.OCR_LANG || "pol+eng+rus+bel+ukr";
+  const ocrLang = process.env.OCR_LANG || "en,ru,be,uk";
 
   const pythonCandidates = [configuredPython, venvPython, "python3"].filter(
     Boolean,
