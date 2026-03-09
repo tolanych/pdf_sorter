@@ -318,15 +318,20 @@ const MIME_MAP = {
 };
 
 function sanitizeFolderName(raw) {
-  return (
+  const MAX_FOLDER_LENGTH = 60;
+  const sanitized =
     raw
       .toLowerCase()
       .trim()
       .replace(/[\s-]+/g, "_")
       .replace(/[^a-z0-9_]/g, "")
       .replace(/_{2,}/g, "_")
-      .replace(/^_|_$/g, "") || "other"
-  );
+      .replace(/^_|_$/g, "") || "other";
+  // Truncate to max length (cut at last underscore to keep clean name)
+  if (sanitized.length <= MAX_FOLDER_LENGTH) return sanitized;
+  const truncated = sanitized.slice(0, MAX_FOLDER_LENGTH);
+  const lastUnderscore = truncated.lastIndexOf("_");
+  return lastUnderscore > 10 ? truncated.slice(0, lastUnderscore) : truncated;
 }
 
 function parseSmartResponse(resBody) {
