@@ -27,7 +27,11 @@ OCR engine: EasyOCR (pure pip, no system dependencies).
 import argparse
 import os
 import sys
+import warnings
 from pathlib import Path
+
+# Suppress noisy PyTorch MPS pin_memory warning on Apple Silicon
+warnings.filterwarnings("ignore", message=".*pin_memory.*")
 
 # EasyOCR language codes (different from Tesseract)
 # EasyOCR: Cyrillic langs are only compatible with English.
@@ -136,11 +140,22 @@ def ocr_image(image_path: str, langs: list[str] | None = None) -> str:
     return "\n".join(all_lines).strip()
 
 
-def _render_pdf_page_to_png(doc, page_index: int, dpi: int = 300) -> bytes:
-    """Render a single PDF page to PNG bytes using PyMuPDF."""
+def _render_pdf_page_to_png(doc, page_index: int, dpi: int = 300) -> bytes | None:
+    """Render a single PDF page to PNG bytes using PyMuPDF.
+
+    Returns None if the page cannot be rendered (e.g. corrupt dimensions).
+    """
     page = doc[page_index]
-    pix = page.get_pixmap(dpi=dpi)
-    return pix.tobytes("png")
+    try:
+        pix = page.get_pixmap(dpi=dpi)
+        return pix.tobytes("png")
+    except Exception:
+        # Some pages have invalid dimensions at high DPI — try lower
+        try:
+            pix = page.get_pixmap(dpi=150)
+            return pix.tobytes("png")
+        except Exception:
+            return None
 
 
 def ocr_pdf(
@@ -165,6 +180,11 @@ def ocr_pdf(
             continue
         page_num = i + 1
         img_bytes = _render_pdf_page_to_png(doc, i, dpi=dpi)
+        if img_bytes is None:
+            texts.append(
+                f"--- Старонка {page_num}/{total} --- (не ўдалося адрэндэрыць)"
+            )
+            continue
         page_lines: list[str] = []
         for group in groups:
             reader = _get_ocr_reader(group)
