@@ -96,7 +96,10 @@ def extract_text_pymupdf(pdf_path: str, pages: list[int] | None = None) -> str:
 def ocr_image(image_path: str, langs: list[str] | None = None) -> str:
     """Распазнаць тэкст з выявы праз EasyOCR."""
     reader = _get_ocr_reader(langs)
-    result = reader.readtext(image_path)
+    # Read file to bytes to avoid OpenCV imread bugs with Unicode paths on Windows
+    with open(image_path, "rb") as f:
+        img_bytes = f.read()
+    result = reader.readtext(img_bytes)
     lines = [text for (_, text, _) in result]
     return "\n".join(lines).strip()
 
@@ -322,6 +325,12 @@ def process_file(
 
 
 def main():
+    # Fix for Windows console encoding issues (UnicodeEncodeError)
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='backslashreplace')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
+
     parser = argparse.ArgumentParser(
         description="Чытанне PDF і выяў з OCR (EasyOCR)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
