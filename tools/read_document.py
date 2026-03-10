@@ -34,20 +34,40 @@ from pathlib import Path
 # Polish uses Latin script — covered by "en" recognition.
 DEFAULT_OCR_LANGS = ["en", "ru", "be", "uk"]
 
-# Lazy-loaded EasyOCR reader (heavy init — reuse across calls)
-_ocr_reader = None
+# EasyOCR: cyrillic languages can only be combined with English.
+# Languages using Latin script (pl, fr, de, es, etc.) cannot mix with cyrillic.
+CYRILLIC_LANGS = {"ru", "rs_cyrillic", "be", "bg", "uk", "mn"}
+
+# Cached EasyOCR readers keyed by frozenset of langs
+_ocr_readers: dict[frozenset, object] = {}
 
 
-def _get_ocr_reader(langs: list[str] | None = None):
-    """Get or create a cached EasyOCR reader instance."""
-    global _ocr_reader
-    if langs is None:
-        langs = DEFAULT_OCR_LANGS
-    if _ocr_reader is None:
-        import easyocr
+def _split_lang_groups(langs: list[str]) -> list[list[str]]:
+    """Split languages into EasyOCR-compatible groups.
 
-        _ocr_reader = easyocr.Reader(langs, gpu=False, verbose=False)
-    return _ocr_reader
+    Cyrillic langs can only be combined with 'en'.
+    Latin-script langs (pl, fr, de, ...) go into a separate group with 'en'.
+    """
+    cyrillic = [l for l in langs if l in CYRILLIC_LANGS]
+    latin = [l for l in langs if l not in CYRILLIC_LANGS and l != "en"]
+    groups = []
+    if cyrillic:
+        groups.append(["en"] + cyrillic if "en" not in cyrillic else cyrillic)
+    if latin:
+        groups.append(["en"] + latin if "en" not in latin else latin)
+    if not groups:
+        groups.append(["en"])
+    return groups
+
+
+def _get_ocr_reader(langs: list[str]):
+    """Get or create a cached EasyOCR reader instance for the given langs."""
+    import easyocr
+
+    key = frozenset(langs)
+    if key not in _ocr_readers:
+        _ocr_readers[key] = easyocr.Reader(langs, gpu=False, verbose=False)
+    return _ocr_readers[key]
 
 
 def extract_text_pdfplumber(pdf_path: str, pages: list[int] | None = None) -> str:
@@ -94,14 +114,26 @@ def extract_text_pymupdf(pdf_path: str, pages: list[int] | None = None) -> str:
 
 
 def ocr_image(image_path: str, langs: list[str] | None = None) -> str:
-    """Распазнаць тэкст з выявы праз EasyOCR."""
-    reader = _get_ocr_reader(langs)
+    """Распазнаць тэкст з выявы праз EasyOCR.
+
+    If langs mix cyrillic and latin-script languages, runs multiple passes
+    and merges results (EasyOCR doesn't allow mixing them).
+    """
+    if langs is None:
+        langs = DEFAULT_OCR_LANGS
     # Read file to bytes to avoid OpenCV imread bugs with Unicode paths on Windows
     with open(image_path, "rb") as f:
         img_bytes = f.read()
-    result = reader.readtext(img_bytes)
-    lines = [text for (_, text, _) in result]
-    return "\n".join(lines).strip()
+
+    groups = _split_lang_groups(langs)
+    all_lines: list[str] = []
+    for group in groups:
+        reader = _get_ocr_reader(group)
+        result = reader.readtext(img_bytes)
+        lines = [text for (_, text, _) in result]
+        all_lines.extend(lines)
+
+    return "\n".join(all_lines).strip()
 
 
 def _render_pdf_page_to_png(doc, page_index: int, dpi: int = 300) -> bytes:
@@ -120,7 +152,9 @@ def ocr_pdf(
     """Распазнаць тэкст у адсканаваным PDF праз EasyOCR + PyMuPDF rendering."""
     import fitz
 
-    reader = _get_ocr_reader(langs)
+    if langs is None:
+        langs = DEFAULT_OCR_LANGS
+    groups = _split_lang_groups(langs)
     doc = fitz.open(pdf_path)
     total = len(doc)
     target_pages = pages if pages else list(range(total))
@@ -131,8 +165,12 @@ def ocr_pdf(
             continue
         page_num = i + 1
         img_bytes = _render_pdf_page_to_png(doc, i, dpi=dpi)
-        result = reader.readtext(img_bytes)
-        page_text = "\n".join(text for (_, text, _) in result).strip()
+        page_lines: list[str] = []
+        for group in groups:
+            reader = _get_ocr_reader(group)
+            result = reader.readtext(img_bytes)
+            page_lines.extend(text for (_, text, _) in result)
+        page_text = "\n".join(page_lines).strip()
         if page_text:
             texts.append(f"--- Старонка {page_num}/{total} ---\n{page_text}")
         else:
@@ -326,10 +364,10 @@ def process_file(
 
 def main():
     # Fix for Windows console encoding issues (UnicodeEncodeError)
-    if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='backslashreplace')
-    if hasattr(sys.stderr, 'reconfigure'):
-        sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
 
     parser = argparse.ArgumentParser(
         description="Чытанне PDF і выяў з OCR (EasyOCR)",
