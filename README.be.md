@@ -77,6 +77,7 @@ npm run apply -- --dry-run --target-dir "C:\Users\You\Documents"
 | Варыянт | Кошт | Трэба інтэрнэт | Як наладзіць |
 |---|---|---|---|
 | **Ollama** (лакальна) | Бясплатна | Не | Усталюйце [Ollama](https://ollama.com), запусціце `ollama serve`, потым `ollama pull gpt-oss:20b` |
+| **OpenRouter** | Бясплатна | Так | Атрымайце ключ на [openrouter.ai](https://openrouter.ai), задайце `OPENROUTER_API_KEY` у `.env` |
 | **OpenAI** | Платна (API) | Так | Атрымайце ключ на [platform.openai.com](https://platform.openai.com), задайце `OPENAI_API_KEY` у `.env` |
 | **Google Gemini** | Платна (API) | Так | Атрымайце ключ на [aistudio.google.com](https://aistudio.google.com), задайце `GOOGLE_GEMINI_API_KEY` у `.env` |
 
@@ -87,6 +88,7 @@ npm run apply -- --dry-run --target-dir "C:\Users\You\Documents"
 | Правайдар | Мадэлі |
 |---|---|
 | OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-2025-04-14`, `gpt-4.1-nano`, `gpt-5`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano` |
+| OpenRouter | `openrouter/free` (па змаўчанні) або іншыя даступныя мадэлі |
 | Google | `gemini-2.5-pro` |
 | Ollama | `llama3.2`, `mistral-small3.1`, `llama3.3:latest`, `gemma3:4b`, `gemma3:12b`, `gpt-oss:20b` |
 
@@ -237,6 +239,9 @@ Shell-абалонка (сама знаходзіць venv): `./tools/read_doc.s
 # Мадэль (апцыянальна — вызначаецца аўтаматычна па даступных ключах)
 LLM_MODEL=gpt-4o-mini
 
+OPENROUTER_API_KEY=sk-...
+OPENROUTER_MODEL=nvidia/nemotron-3-nano-30b-a3b:free
+
 # OpenAI
 OPENAI_API_KEY=sk-...
 
@@ -263,7 +268,7 @@ OCR_LANG=en,ru,be,uk
 VISION_MODEL=gpt-4o
 ```
 
-Прыярытэт мадэлі: `LLM_MODEL` > `OPENAI_MODEL` (калі ёсць ключ) > `OLLAMA_MODEL` > `GOOGLE_MODEL` (калі ёсць ключ) > `gpt-oss:20b` як fallback.
+Прыярытэт мадэлі: `LLM_MODEL` > `OPENROUTER_MODEL` > `OPENAI_MODEL` (калі ёсць ключ) > `OLLAMA_MODEL` > `GOOGLE_MODEL` (калі ёсць ключ) > `gpt-oss:20b` як fallback.
 
 ---
 

@@ -17,6 +17,7 @@ export const Model = {
   GEMMA3_4: "gemma3:4b",
   GEMMA3_12: "gemma3:12b",
   GEMINI_PRO: "gemini-2.5-pro",
+  OPENROUTER_FREE: "openrouter/free",
   GPT_OSS_20B: "gpt-oss:20b",
 };
 
@@ -99,8 +100,26 @@ function buildOllamaModel(model, ollamaBaseUrl) {
   });
 }
 
+function buildOpenRouterModel(model) {
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error("OPENROUTER_API_KEY is required for OpenRouter models");
+  }
+
+  return new ChatOpenAI({
+    model,
+    apiKey: process.env.OPENROUTER_API_KEY,
+    configuration: { baseURL: "https://openrouter.ai/api/v1" },
+    temperature: 0.7,
+  });
+}
+
 export function buildChatModel(config) {
   const model = config.model || process.env.OPENAI_MODEL || Model.GPT4oMini;
+
+  if (model.includes("/") && process.env.OPENROUTER_API_KEY) {
+    return buildOpenRouterModel(model);
+  }
+
   assertSupportedModel(model);
 
   switch (model) {

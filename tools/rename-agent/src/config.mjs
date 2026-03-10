@@ -17,6 +17,10 @@ const INCLUDE_PRESETS = {
 function resolveDefaultModel() {
   if (process.env.LLM_MODEL) return process.env.LLM_MODEL;
 
+  if (process.env.OPENROUTER_API_KEY) {
+    return process.env.OPENROUTER_MODEL || "openrouter/free";
+  }
+
   if (process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL) {
     return process.env.OPENAI_MODEL;
   }

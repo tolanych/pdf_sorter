@@ -77,6 +77,7 @@ npm run apply -- --dry-run --target-dir "C:\Users\You\Documents"
 | Option | Cost | Needs internet | Setup |
 |---|---|---|---|
 | **Ollama** (local) | Free | No | Install [Ollama](https://ollama.com), run `ollama serve`, then `ollama pull gpt-oss:20b` |
+| **OpenRouter** | Free | Yes | Get a key at [openrouter.ai](https://openrouter.ai), set `OPENROUTER_API_KEY` in `.env` |
 | **OpenAI** | Paid (API) | Yes | Get a key at [platform.openai.com](https://platform.openai.com), set `OPENAI_API_KEY` in `.env` |
 | **Google Gemini** | Paid (API) | Yes | Get a key at [aistudio.google.com](https://aistudio.google.com), set `GOOGLE_GEMINI_API_KEY` in `.env` |
 
@@ -87,6 +88,7 @@ With Ollama, the agent works entirely offline and free of charge.
 | Provider | Models |
 |---|---|
 | OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-2025-04-14`, `gpt-4.1-nano`, `gpt-5`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano` |
+| OpenRouter | `openrouter/free` (default) or other available models |
 | Google | `gemini-2.5-pro` |
 | Ollama | `llama3.2`, `mistral-small3.1`, `llama3.3:latest`, `gemma3:4b`, `gemma3:12b`, `gpt-oss:20b` |
 
@@ -237,6 +239,9 @@ Key settings:
 # Model (optional — auto-detected from available keys)
 LLM_MODEL=gpt-4o-mini
 
+OPENROUTER_API_KEY=sk-...
+OPENROUTER_MODEL=nvidia/nemotron-3-nano-30b-a3b:free
+
 # OpenAI
 OPENAI_API_KEY=sk-...
 
@@ -263,7 +268,7 @@ OCR_LANG=en,ru,be,uk
 VISION_MODEL=gpt-4o
 ```
 
-Model priority: `LLM_MODEL` > `OPENAI_MODEL` (if key set) > `OLLAMA_MODEL` > `GOOGLE_MODEL` (if key set) > `gpt-oss:20b` fallback.
+Model priority: `LLM_MODEL` > `OPENROUTER_MODEL` > `OPENAI_MODEL` (if key set) > `OLLAMA_MODEL` > `GOOGLE_MODEL` (if key set) > `gpt-oss:20b` fallback.
 
 ---
 
