@@ -77,7 +77,7 @@ npm run apply -- --dry-run --target-dir "C:\Users\You\Documents"
 | Option | Cost | Needs internet | Setup |
 |---|---|---|---|
 | **Ollama** (local) | Free | No | Install [Ollama](https://ollama.com), run `ollama serve`, then `ollama pull gpt-oss:20b` |
-| **OpenRouter** | Free | Yes | Get a key at [openrouter.ai](https://openrouter.ai), set `OPENROUTER_API_KEY` in `.env` |
+| **OpenRouter** | Free / Paid | Yes | Get a key at [openrouter.ai](https://openrouter.ai), set `OPENROUTER_API_KEY` in `.env` |
 | **OpenAI** | Paid (API) | Yes | Get a key at [platform.openai.com](https://platform.openai.com), set `OPENAI_API_KEY` in `.env` |
 | **Google Gemini** | Paid (API) | Yes | Get a key at [aistudio.google.com](https://aistudio.google.com), set `GOOGLE_GEMINI_API_KEY` in `.env` |
 

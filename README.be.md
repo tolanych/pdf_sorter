@@ -77,7 +77,7 @@ npm run apply -- --dry-run --target-dir "C:\Users\You\Documents"
 | Варыянт | Кошт | Трэба інтэрнэт | Як наладзіць |
 |---|---|---|---|
 | **Ollama** (лакальна) | Бясплатна | Не | Усталюйце [Ollama](https://ollama.com), запусціце `ollama serve`, потым `ollama pull gpt-oss:20b` |
-| **OpenRouter** | Бясплатна | Так | Атрымайце ключ на [openrouter.ai](https://openrouter.ai), задайце `OPENROUTER_API_KEY` у `.env` |
+| **OpenRouter** | Бясплатна / Платна | Так | Атрымайце ключ на [openrouter.ai](https://openrouter.ai), задайце `OPENROUTER_API_KEY` у `.env` |
 | **OpenAI** | Платна (API) | Так | Атрымайце ключ на [platform.openai.com](https://platform.openai.com), задайце `OPENAI_API_KEY` у `.env` |
 | **Google Gemini** | Платна (API) | Так | Атрымайце ключ на [aistudio.google.com](https://aistudio.google.com), задайце `GOOGLE_GEMINI_API_KEY` у `.env` |
 

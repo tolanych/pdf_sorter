@@ -55,6 +55,10 @@ const OPENAI_MODEL_OPTIONS = {
 
 const SUPPORTED_MODELS = new Set(Object.values(Model));
 
+const isOpenRouter = (m) =>
+  typeof m === "string" &&
+  (m.startsWith("openrouter/") || process.env.OPENROUTER_MODEL === m || process.env.VISION_MODEL === m);
+
 function assertSupportedModel(model) {
   if (SUPPORTED_MODELS.has(model)) return;
 
@@ -116,7 +120,7 @@ function buildOpenRouterModel(model) {
 export function buildChatModel(config) {
   const model = config.model || process.env.OPENAI_MODEL || Model.GPT4oMini;
 
-  if (model.includes("/") && process.env.OPENROUTER_API_KEY) {
+  if (isOpenRouter(model) && process.env.OPENROUTER_API_KEY) {
     return buildOpenRouterModel(model);
   }
 
