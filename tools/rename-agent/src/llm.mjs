@@ -2,6 +2,44 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatOllama } from "@langchain/ollama";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
+// ── Supported providers ─────────────────────────────────────────────
+export const Provider = {
+  OPENAI: "openai",
+  OLLAMA: "ollama",
+  GOOGLE: "google",
+  OPENROUTER: "openrouter",
+};
+
+// ── Allowed models per provider ────────────────────────────────────
+export const ProviderModels = {
+  [Provider.OPENAI]: [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4.1-2025-04-14",
+    "gpt-4.1-nano",
+    "gpt-5",
+    "gpt-5.1",
+    "gpt-5-mini",
+    "gpt-5-nano",
+  ],
+  [Provider.OLLAMA]: [
+    "llama3.2",
+    "mistral-small3.1",
+    "llama3.3:latest",
+    "gemma3:4b",
+    "gemma3:12b",
+    "gpt-oss:20b",
+  ],
+  [Provider.GOOGLE]: ["gemini-2.5-pro"],
+  [Provider.OPENROUTER]: [
+    "openrouter/auto",
+    "google/gemma-3-4b-it:free",
+    "nvidia/llama-3.1-nemotron-70b-instruct:free",
+    "mistralai/mistral-7b-instruct:free",
+  ],
+};
+
+// Flat set for quick lookups; also used by legacy callers
 export const Model = {
   LLM3: "llama3.2",
   GPT4o: "gpt-4o",
@@ -17,78 +55,85 @@ export const Model = {
   GEMMA3_4: "gemma3:4b",
   GEMMA3_12: "gemma3:12b",
   GEMINI_PRO: "gemini-2.5-pro",
-  OPENROUTER_FREE: "openrouter/free",
   GPT_OSS_20B: "gpt-oss:20b",
 };
 
+// ── Default models per provider ────────────────────────────────────
+const DEFAULT_MODEL = {
+  [Provider.OPENAI]: "gpt-4o-mini",
+  [Provider.OLLAMA]: "gpt-oss:20b",
+  [Provider.GOOGLE]: "gemini-2.5-pro",
+  [Provider.OPENROUTER]: "openrouter/auto",
+};
+
+const VALID_PROVIDERS = new Set(Object.values(Provider));
+
+// ── Provider-specific build options ────────────────────────────────
 const OPENAI_DEFAULT_OPTIONS = {
   timeout: Number(process.env.OPENAI_TIMEOUT_MS || 90000),
   maxRetries: Number(process.env.OPENAI_MAX_RETRIES || 2),
 };
 
 const OPENAI_MODEL_OPTIONS = {
-  [Model.GPT4o]: { temperature: 0.7 },
-  [Model.GPT4oMini]: { temperature: 0.7 },
-  [Model.GPT4_1]: { temperature: 0.7 },
-  [Model.GPT4_1_NANO]: { temperature: 0.7 },
-  [Model.GPT5]: {
+  "gpt-4o": { temperature: 0.7 },
+  "gpt-4o-mini": { temperature: 0.7 },
+  "gpt-4.1-2025-04-14": { temperature: 0.7 },
+  "gpt-4.1-nano": { temperature: 0.7 },
+  "gpt-5": {
     temperature: 1,
     useResponsesApi: true,
     reasoning: { effort: "minimal" },
   },
-  [Model.GPT5_1]: {
+  "gpt-5.1": {
     temperature: 1,
     useResponsesApi: true,
     reasoning: { effort: "none" },
   },
-  [Model.GPT5_MINI]: {
+  "gpt-5-mini": {
     temperature: 1,
     useResponsesApi: true,
     reasoning: { effort: "minimal" },
   },
-  [Model.GPT5_NANO]: {
+  "gpt-5-nano": {
     temperature: 1,
     useResponsesApi: true,
     reasoning: { effort: "minimal" },
   },
 };
 
-const SUPPORTED_MODELS = new Set(Object.values(Model));
-
-const isOpenRouter = (m) =>
-  typeof m === "string" &&
-  (m.startsWith("openrouter/") || process.env.OPENROUTER_MODEL === m || process.env.VISION_MODEL === m);
-
-function assertSupportedModel(model) {
-  if (SUPPORTED_MODELS.has(model)) return;
-
-  const supported = Object.values(Model).join(", ");
-  throw new Error(
-    `Unsupported model: ${model}. Supported models: ${supported}`,
-  );
+// ── Validation ─────────────────────────────────────────────────────
+function assertProviderModel(provider, model) {
+  if (!VALID_PROVIDERS.has(provider)) {
+    throw new Error(
+      `Unsupported provider: "${provider}". Choose one of: ${[...VALID_PROVIDERS].join(", ")}`,
+    );
+  }
+  const allowed = ProviderModels[provider];
+  if (!allowed.includes(model)) {
+    throw new Error(
+      `Model "${model}" is not supported by provider "${provider}". Allowed: ${allowed.join(", ")}`,
+    );
+  }
 }
 
+// ── Builders (one per provider) ────────────────────────────────────
 function buildOpenAIModel(model) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is required for OpenAI models");
   }
-
-  const options = {
+  return new ChatOpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     model,
     ...OPENAI_DEFAULT_OPTIONS,
     ...(OPENAI_MODEL_OPTIONS[model] || { temperature: 0 }),
-  };
-
-  return new ChatOpenAI(options);
+  });
 }
 
 function buildGoogleModel(model) {
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("GOOGLE_GEMINI_API_KEY is required for Gemini models");
+    throw new Error("GOOGLE_GEMINI_API_KEY is required for Google models");
   }
-
   return new ChatGoogleGenerativeAI({
     model,
     temperature: 0.7,
@@ -99,7 +144,7 @@ function buildGoogleModel(model) {
 function buildOllamaModel(model, ollamaBaseUrl) {
   return new ChatOllama({
     baseUrl: ollamaBaseUrl,
-    model: model || process.env.OLLAMA_MODEL || Model.GPT_OSS_20B,
+    model,
     temperature: 0,
   });
 }
@@ -108,7 +153,6 @@ function buildOpenRouterModel(model) {
   if (!process.env.OPENROUTER_API_KEY) {
     throw new Error("OPENROUTER_API_KEY is required for OpenRouter models");
   }
-
   return new ChatOpenAI({
     model,
     apiKey: process.env.OPENROUTER_API_KEY,
@@ -117,35 +161,38 @@ function buildOpenRouterModel(model) {
   });
 }
 
+// ── Main entry point ───────────────────────────────────────────────
+/**
+ * Build a chat model based on explicit provider + model from config.
+ *
+ * @param {object} config
+ * @param {string} config.provider  - one of Provider values
+ * @param {string} [config.model]   - model name within the provider (uses default if omitted)
+ * @param {string} [config.ollamaBaseUrl]
+ */
 export function buildChatModel(config) {
-  const model = config.model || process.env.OPENAI_MODEL || Model.GPT4oMini;
+  const provider = config.provider;
+  const model = config.model || DEFAULT_MODEL[provider];
 
-  if (isOpenRouter(model) && process.env.OPENROUTER_API_KEY) {
-    return buildOpenRouterModel(model);
+  if (!provider) {
+    throw new Error(
+      "config.provider is required. Set LLM_PROVIDER in .env " +
+        `(${[...VALID_PROVIDERS].join(", ")})`,
+    );
   }
 
-  assertSupportedModel(model);
+  assertProviderModel(provider, model);
 
-  switch (model) {
-    case Model.GPT4o:
-    case Model.GPT4oMini:
-    case Model.GPT4_1:
-    case Model.GPT4_1_NANO:
-    case Model.GPT5:
-    case Model.GPT5_1:
-    case Model.GPT5_MINI:
-    case Model.GPT5_NANO:
+  switch (provider) {
+    case Provider.OPENAI:
       return buildOpenAIModel(model);
-    case Model.GEMINI_PRO:
+    case Provider.GOOGLE:
       return buildGoogleModel(model);
-    case Model.LLM3:
-    case Model.MISTRAL:
-    case Model.LLAMA3_3:
-    case Model.GEMMA3_4:
-    case Model.GEMMA3_12:
-    case Model.GPT_OSS_20B:
+    case Provider.OPENROUTER:
+      return buildOpenRouterModel(model);
+    case Provider.OLLAMA:
       return buildOllamaModel(model, config.ollamaBaseUrl);
     default:
-      throw new Error(`Unsupported model: ${model}`);
+      throw new Error(`Unknown provider: ${provider}`);
   }
 }

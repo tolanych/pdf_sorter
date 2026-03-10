@@ -520,16 +520,23 @@ async function main() {
   let visionDisabledReason = "";
   if (args.smart) {
     llm = buildChatModel(args);
-    // Vision-мадэль для аналізу выяў (GPT-4o ці Gemini)
-    const visionModel = process.env.VISION_MODEL || "gpt-4o";
+    // Vision-мадэль для аналізу выяў
+    const visionModel = args.visionModel || args.model;
+    const visionProvider = args.visionProvider || args.provider;
     try {
-      visionLlm = buildChatModel({ ...args, model: visionModel });
-      console.log(`Smart mode: text=${args.model}, vision=${visionModel}`);
+      visionLlm = buildChatModel({
+        ...args,
+        provider: visionProvider,
+        model: visionModel,
+      });
+      console.log(
+        `Smart mode: text=${args.provider}/${args.model}, vision=${visionProvider}/${visionModel}`,
+      );
     } catch {
       console.log(
-        `Smart mode: text=${args.model}, vision=disabled (no key for ${visionModel})`,
+        `Smart mode: text=${args.provider}/${args.model}, vision=disabled (${visionProvider}/${visionModel} failed)`,
       );
-      visionDisabledReason = `init failed for ${visionModel}`;
+      visionDisabledReason = `init failed for ${visionProvider}/${visionModel}`;
     }
   }
 
