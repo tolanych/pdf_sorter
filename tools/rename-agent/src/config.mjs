@@ -37,15 +37,16 @@ function resolveProvider() {
 function resolveModel(provider) {
   if (process.env.LLM_MODEL) return process.env.LLM_MODEL;
 
+  // No LLM_MODEL set — use provider's built-in default
   switch (provider) {
     case Provider.OPENROUTER:
-      return process.env.OPENROUTER_MODEL || "openrouter/auto";
+      return "openrouter/auto";
     case Provider.OPENAI:
-      return process.env.OPENAI_MODEL || "gpt-4o-mini";
+      return "gpt-4o-mini";
     case Provider.GOOGLE:
-      return process.env.GOOGLE_MODEL || "gemini-2.5-pro";
+      return "gemini-2.5-pro";
     case Provider.OLLAMA:
-      return process.env.OLLAMA_MODEL || "gpt-oss:20b";
+      return "gpt-oss:20b";
     default:
       return "gpt-oss:20b";
   }
@@ -53,17 +54,17 @@ function resolveModel(provider) {
 
 /**
  * Resolve vision provider + model.
- * Uses VISION_PROVIDER/VISION_MODEL if set, otherwise falls back to main provider.
+ * Uses VISION_PROVIDER/VISION_MODEL if set, otherwise falls back to main LLM_PROVIDER/LLM_MODEL.
  */
 function resolveVision(mainProvider) {
-  const vModel = process.env.VISION_MODEL;
-  if (!vModel) return { provider: mainProvider, model: null };
-
   const vProvider = (process.env.VISION_PROVIDER || "").toLowerCase().trim();
-  if (vProvider) return { provider: vProvider, model: vModel };
+  const vModel = process.env.VISION_MODEL;
 
-  // Default vision provider = main provider
-  return { provider: mainProvider, model: vModel };
+  if (vProvider && vModel) return { provider: vProvider, model: vModel };
+  if (vModel) return { provider: mainProvider, model: vModel };
+
+  // Nothing set — vision will use the same provider & model as the main LLM
+  return { provider: mainProvider, model: null };
 }
 
 export function parseArgs(argv) {
