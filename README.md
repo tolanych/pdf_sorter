@@ -77,18 +77,22 @@ npm run apply -- --dry-run --target-dir "C:\Users\You\Documents"
 | Option | Cost | Needs internet | Setup |
 |---|---|---|---|
 | **Ollama** (local) | Free | No | Install [Ollama](https://ollama.com), run `ollama serve`, then `ollama pull gpt-oss:20b` |
+| **OpenRouter** | Free / Paid | Yes | Get a key at [openrouter.ai](https://openrouter.ai), set `OPENROUTER_API_KEY` in `.env` |
 | **OpenAI** | Paid (API) | Yes | Get a key at [platform.openai.com](https://platform.openai.com), set `OPENAI_API_KEY` in `.env` |
 | **Google Gemini** | Paid (API) | Yes | Get a key at [aistudio.google.com](https://aistudio.google.com), set `GOOGLE_GEMINI_API_KEY` in `.env` |
 
 With Ollama, the agent works entirely offline and free of charge.
 
-### Supported Models
+### Supported Providers & Models
 
-| Provider | Models |
+Set `LLM_PROVIDER` in `.env` to choose a provider explicitly, or let the system auto-detect from available API keys.
+
+| Provider (`LLM_PROVIDER=`) | Models |
 |---|---|
-| OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-2025-04-14`, `gpt-4.1-nano`, `gpt-5`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano` |
-| Google | `gemini-2.5-pro` |
-| Ollama | `llama3.2`, `mistral-small3.1`, `llama3.3:latest`, `gemma3:4b`, `gemma3:12b`, `gpt-oss:20b` |
+| `openai` | `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-2025-04-14`, `gpt-4.1-nano`, `gpt-5`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano` |
+| `openrouter` | `openrouter/auto`, `google/gemma-3-4b-it:free`, `nvidia/llama-3.1-nemotron-70b-instruct:free`, `mistralai/mistral-7b-instruct:free` |
+| `google` | `gemini-2.5-pro` |
+| `ollama` (default) | `llama3.2`, `mistral-small3.1`, `llama3.3:latest`, `gemma3:4b`, `gemma3:12b`, `gpt-oss:20b` |
 
 ---
 
@@ -234,15 +238,21 @@ The `.env` file in the project root controls all settings. Created automatically
 Key settings:
 
 ```env
-# Model (optional — auto-detected from available keys)
-LLM_MODEL=gpt-4o-mini
+# Provider: openai | ollama | google | openrouter
+# Auto-detected from API keys if not set (fallback: ollama)
+LLM_PROVIDER=ollama
+
+# Model within the provider (uses provider's default if not set)
+LLM_MODEL=gpt-oss:20b
+
+# OpenRouter
+OPENROUTER_API_KEY=sk-...
 
 # OpenAI
 OPENAI_API_KEY=sk-...
 
 # Ollama (local, free)
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=gpt-oss:20b
 
 # Google Gemini
 GOOGLE_GEMINI_API_KEY=...
@@ -260,10 +270,13 @@ READER_PYTHON=.venv/bin/python
 OCR_LANG=en,ru,be,uk
 
 # Vision model for organize:smart (optional)
-VISION_MODEL=gpt-4o
+# Uses same provider as LLM_PROVIDER unless VISION_PROVIDER is set
+VISION_MODEL=gemma3:4b
+# VISION_PROVIDER=openai
+# VISION_MODEL=gpt-4o
 ```
 
-Model priority: `LLM_MODEL` > `OPENAI_MODEL` (if key set) > `OLLAMA_MODEL` > `GOOGLE_MODEL` (if key set) > `gpt-oss:20b` fallback.
+Provider priority: `LLM_PROVIDER` > auto-detect from API keys (`OPENROUTER_API_KEY` > `OPENAI_API_KEY` > `GOOGLE_GEMINI_API_KEY`) > `ollama` fallback.
 
 ---
 

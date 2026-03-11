@@ -77,18 +77,22 @@ npm run apply -- --dry-run --target-dir "C:\Users\You\Documents"
 | Варыянт | Кошт | Трэба інтэрнэт | Як наладзіць |
 |---|---|---|---|
 | **Ollama** (лакальна) | Бясплатна | Не | Усталюйце [Ollama](https://ollama.com), запусціце `ollama serve`, потым `ollama pull gpt-oss:20b` |
+| **OpenRouter** | Бясплатна / Платна | Так | Атрымайце ключ на [openrouter.ai](https://openrouter.ai), задайце `OPENROUTER_API_KEY` у `.env` |
 | **OpenAI** | Платна (API) | Так | Атрымайце ключ на [platform.openai.com](https://platform.openai.com), задайце `OPENAI_API_KEY` у `.env` |
 | **Google Gemini** | Платна (API) | Так | Атрымайце ключ на [aistudio.google.com](https://aistudio.google.com), задайце `GOOGLE_GEMINI_API_KEY` у `.env` |
 
 З Ollama агент працуе цалкам аўтаномна і бясплатна.
 
-### Падтрымліваемыя мадэлі
+### Падтрымліваемыя правайдары і мадэлі
 
-| Правайдар | Мадэлі |
+Усталюйце `LLM_PROVIDER` у `.env`, каб відавочна абраць правайдэра, або дазвольце сістэме вызначыць аўтаматычна па даступных API-ключах.
+
+| Правайдар (`LLM_PROVIDER=`) | Мадэлі |
 |---|---|
-| OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-2025-04-14`, `gpt-4.1-nano`, `gpt-5`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano` |
-| Google | `gemini-2.5-pro` |
-| Ollama | `llama3.2`, `mistral-small3.1`, `llama3.3:latest`, `gemma3:4b`, `gemma3:12b`, `gpt-oss:20b` |
+| `openai` | `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-2025-04-14`, `gpt-4.1-nano`, `gpt-5`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano` |
+| `openrouter` | `openrouter/auto`, `google/gemma-3-4b-it:free`, `nvidia/llama-3.1-nemotron-70b-instruct:free`, `mistralai/mistral-7b-instruct:free` |
+| `google` | `gemini-2.5-pro` |
+| `ollama` (па змаўчанні) | `llama3.2`, `mistral-small3.1`, `llama3.3:latest`, `gemma3:4b`, `gemma3:12b`, `gpt-oss:20b` |
 
 ---
 
@@ -234,15 +238,21 @@ Shell-абалонка (сама знаходзіць venv): `./tools/read_doc.s
 Асноўныя налады:
 
 ```env
-# Мадэль (апцыянальна — вызначаецца аўтаматычна па даступных ключах)
-LLM_MODEL=gpt-4o-mini
+# Правайдар: openai | ollama | google | openrouter
+# Аўтавызначэнне па API-ключах, калі не зададзена (fallback: ollama)
+LLM_PROVIDER=ollama
+
+# Мадэль у межах правайдэра (калі не зададзена — дэфолт правайдэра)
+LLM_MODEL=gpt-oss:20b
+
+# OpenRouter
+OPENROUTER_API_KEY=sk-...
 
 # OpenAI
 OPENAI_API_KEY=sk-...
 
 # Ollama (лакальна, бясплатна)
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=gpt-oss:20b
 
 # Google Gemini
 GOOGLE_GEMINI_API_KEY=...
@@ -260,10 +270,13 @@ READER_PYTHON=.venv/bin/python
 OCR_LANG=en,ru,be,uk
 
 # Vision-мадэль для organize:smart (апцыянальна)
-VISION_MODEL=gpt-4o
+# Выкарыстоўвае LLM_PROVIDER калі VISION_PROVIDER не зададзены
+VISION_MODEL=gemma3:4b
+# VISION_PROVIDER=openai
+# VISION_MODEL=gpt-4o
 ```
 
-Прыярытэт мадэлі: `LLM_MODEL` > `OPENAI_MODEL` (калі ёсць ключ) > `OLLAMA_MODEL` > `GOOGLE_MODEL` (калі ёсць ключ) > `gpt-oss:20b` як fallback.
+Прыярытэт правайдэра: `LLM_PROVIDER` > аўтавызначэнне па ключах (`OPENROUTER_API_KEY` > `OPENAI_API_KEY` > `GOOGLE_GEMINI_API_KEY`) > `ollama` як fallback.
 
 ---
 

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { Provider } from "./llm.mjs";
 
 const moduleFile = fileURLToPath(import.meta.url);
 const moduleDir = path.dirname(moduleFile);
@@ -14,20 +15,56 @@ const INCLUDE_PRESETS = {
   docs: "**/*.{doc,docx,xml}",
 };
 
-function resolveDefaultModel() {
+/**
+ * Resolve LLM provider from env.
+ * Priority: LLM_PROVIDER > auto-detect by available API keys > ollama fallback.
+ */
+function resolveProvider() {
+  const explicit = (process.env.LLM_PROVIDER || "").toLowerCase().trim();
+  if (explicit) return explicit;
+
+  // Auto-detect by available keys
+  if (process.env.OPENROUTER_API_KEY) return Provider.OPENROUTER;
+  if (process.env.OPENAI_API_KEY) return Provider.OPENAI;
+  if (process.env.GOOGLE_GEMINI_API_KEY) return Provider.GOOGLE;
+  return Provider.OLLAMA;
+}
+
+/**
+ * Resolve model within the given provider.
+ * Priority: LLM_MODEL > provider-specific *_MODEL env > built-in default.
+ */
+function resolveModel(provider) {
   if (process.env.LLM_MODEL) return process.env.LLM_MODEL;
 
-  if (process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL) {
-    return process.env.OPENAI_MODEL;
+  // No LLM_MODEL set — use provider's built-in default
+  switch (provider) {
+    case Provider.OPENROUTER:
+      return "openrouter/auto";
+    case Provider.OPENAI:
+      return "gpt-4o-mini";
+    case Provider.GOOGLE:
+      return "gemini-2.5-pro";
+    case Provider.OLLAMA:
+      return "gpt-oss:20b";
+    default:
+      return "gpt-oss:20b";
   }
+}
 
-  if (process.env.OLLAMA_MODEL) return process.env.OLLAMA_MODEL;
+/**
+ * Resolve vision provider + model.
+ * Uses VISION_PROVIDER/VISION_MODEL if set, otherwise falls back to main LLM_PROVIDER/LLM_MODEL.
+ */
+function resolveVision(mainProvider) {
+  const vProvider = (process.env.VISION_PROVIDER || "").toLowerCase().trim();
+  const vModel = process.env.VISION_MODEL;
 
-  if (process.env.GOOGLE_GEMINI_API_KEY && process.env.GOOGLE_MODEL) {
-    return process.env.GOOGLE_MODEL;
-  }
+  if (vProvider && vModel) return { provider: vProvider, model: vModel };
+  if (vModel) return { provider: mainProvider, model: vModel };
 
-  return "gpt-oss:20b";
+  // Nothing set — vision will use the same provider & model as the main LLM
+  return { provider: mainProvider, model: null };
 }
 
 export function parseArgs(argv) {
@@ -35,6 +72,7 @@ export function parseArgs(argv) {
   const args = {
     targetDir: defaultTargetDir,
     dryRun: String(process.env.DRY_RUN || "true").toLowerCase() !== "false",
+    provider: "",
     model: "",
     ollamaBaseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
     include: [INCLUDE_PRESETS.all],
@@ -58,6 +96,7 @@ export function parseArgs(argv) {
     if (token === "--apply") args.dryRun = false;
     if (token === "--dry-run") args.dryRun = true;
     if (token === "--target-dir") args.targetDir = argv[i + 1];
+    if (token === "--provider") args.provider = argv[i + 1];
     if (token === "--model") args.model = argv[i + 1];
     if (token === "--ollama-base-url") args.ollamaBaseUrl = argv[i + 1];
     if (token === "--limit") args.limit = Number(argv[i + 1] || 0);
@@ -85,9 +124,18 @@ export function parseArgs(argv) {
     args.ignoreListPath = path.resolve(projectRoot, args.ignoreListPath);
   }
 
-  if (!args.model) {
-    args.model = resolveDefaultModel();
+  // Resolve provider & model
+  if (!args.provider) {
+    args.provider = resolveProvider();
   }
+  if (!args.model) {
+    args.model = resolveModel(args.provider);
+  }
+
+  // Resolve vision model
+  const vision = resolveVision(args.provider);
+  args.visionProvider = vision.provider;
+  args.visionModel = vision.model;
 
   return args;
 }
